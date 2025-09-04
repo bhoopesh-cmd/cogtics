@@ -1,0 +1,19 @@
+# RLDA Streamlit App Requirements
+streamlit
+pandas
+openai
+jinja2
+python-dateutil
+xhtml2pdf
+firebase-admin
+pyrebase4
+plotly
+kaleido
+weasyprint
+google-cloud-firestore
+requests
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+schedule 
