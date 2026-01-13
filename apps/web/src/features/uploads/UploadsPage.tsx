@@ -1,0 +1,332 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  Upload,
+  FileText,
+  FileSpreadsheet,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Loader2,
+  AlertTriangle,
+  Trash2,
+  Eye,
+  RotateCcw,
+  Plus,
+} from 'lucide-react';
+import { listUploads, deleteUpload, reprocessUpload } from '@/lib/api/endpoints';
+import { UploadWizardModal } from './UploadWizardModal';
+import DecorativeDots from '@/components/ui/DecorativeDots';
+
+type UploadType = 'csv' | 'pdf' | 'all';
+
+export function UploadsPage() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [typeFilter, setTypeFilter] = useState<UploadType>('all');
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+
+  // Fetch uploads
+  const { data: uploadsData, isLoading, refetch } = useQuery({
+    queryKey: ['uploads', typeFilter],
+    queryFn: async () => {
+      const res = await listUploads({ type: typeFilter === 'all' ? undefined : typeFilter });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (uploadId: string) => {
+      const res = await deleteUpload(uploadId);
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['uploads'] });
+    },
+  });
+
+  // Reprocess mutation
+  const reprocessMutation = useMutation({
+    mutationFn: async (uploadId: string) => {
+      const res = await reprocessUpload(uploadId);
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['uploads'] });
+    },
+  });
+
+  const uploads = uploadsData?.uploads ?? [];
+  const total = uploadsData?.total ?? 0;
+
+  // Stats
+  const stats = {
+    total: total,
+    processing: uploads.filter(u => u.status === 'processing' || u.status === 'uploading').length,
+    completed: uploads.filter(u => u.status === 'completed').length,
+    failed: uploads.filter(u => u.status === 'failed').length,
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle size={16} className="text-green-400" />;
+      case 'failed':
+        return <XCircle size={16} className="text-red-400" />;
+      case 'processing':
+      case 'uploading':
+        return <Loader2 size={16} className="text-blue-400 animate-spin" />;
+      default:
+        return <AlertTriangle size={16} className="text-yellow-400" />;
+    }
+  };
+
+  const getStatusBadgeClasses = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-500/10 text-green-400 border-green-500/20';
+      case 'failed':
+        return 'bg-red-500/10 text-red-400 border-red-500/20';
+      case 'processing':
+      case 'uploading':
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      default:
+        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
+      {/* Header */}
+      <div className="flex justify-between items-end">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <Upload size={24} className="text-accent" />
+            <h1 className="text-3xl font-light text-white tracking-tight">Manual Uploads</h1>
+          </div>
+          <p className="text-zinc-500">Upload CSV files or PDF contracts for data ingestion.</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => refetch()}
+            className="p-2 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all"
+          >
+            <RefreshCw size={16} />
+          </button>
+          <button
+            onClick={() => setIsWizardOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg transition-colors"
+          >
+            <Plus size={16} />
+            New Upload
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <StatCard label="Total Uploads" value={stats.total} />
+        <StatCard label="Processing" value={stats.processing} variant="blue" />
+        <StatCard label="Completed" value={stats.completed} variant="green" />
+        <StatCard label="Failed" value={stats.failed} variant="red" />
+      </div>
+
+      {/* Type Filter */}
+      <div className="flex gap-2">
+        {(['all', 'csv', 'pdf'] as const).map((type) => (
+          <button
+            key={type}
+            onClick={() => setTypeFilter(type)}
+            className={`px-4 py-2 rounded-lg border transition-all ${
+              typeFilter === type
+                ? 'bg-accent/10 border-accent text-accent'
+                : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600'
+            }`}
+          >
+            {type === 'all' ? 'All' : type === 'csv' ? 'CSV Files' : 'PDF Contracts'}
+          </button>
+        ))}
+      </div>
+
+      {/* Uploads Table */}
+      <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-6 relative overflow-hidden">
+        <DecorativeDots position="topRight" />
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 size={24} className="text-accent animate-spin" />
+          </div>
+        ) : uploads.length === 0 ? (
+          <div className="text-center py-12">
+            <Upload size={48} className="mx-auto mb-4 text-zinc-600" />
+            <h3 className="text-lg font-medium text-white mb-2">No uploads yet</h3>
+            <p className="text-zinc-500 mb-4">Upload your first CSV or PDF file to get started.</p>
+            <button
+              onClick={() => setIsWizardOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg transition-colors"
+            >
+              <Plus size={16} />
+              New Upload
+            </button>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="text-left text-zinc-500 text-sm border-b border-zinc-800">
+                <th className="pb-3 font-medium">File</th>
+                <th className="pb-3 font-medium">Type</th>
+                <th className="pb-3 font-medium">Status</th>
+                <th className="pb-3 font-medium">Rows</th>
+                <th className="pb-3 font-medium">Errors</th>
+                <th className="pb-3 font-medium">Created</th>
+                <th className="pb-3 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <AnimatePresence>
+                {uploads.map((upload) => (
+                  <motion.tr
+                    key={upload.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
+                  >
+                    <td className="py-4">
+                      <div className="flex items-center gap-3">
+                        {upload.type === 'csv' ? (
+                          <FileSpreadsheet size={20} className="text-green-400" />
+                        ) : (
+                          <FileText size={20} className="text-red-400" />
+                        )}
+                        <span className="text-white font-medium">{upload.displayName}</span>
+                      </div>
+                    </td>
+                    <td className="py-4">
+                      <span className="text-zinc-400 uppercase text-sm">{upload.type}</span>
+                    </td>
+                    <td className="py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs border ${getStatusBadgeClasses(upload.status)}`}>
+                        {getStatusIcon(upload.status)}
+                        {upload.status}
+                      </span>
+                    </td>
+                    <td className="py-4">
+                      <span className="text-zinc-400">
+                        {upload.validRows ?? 0} / {upload.totalRows ?? 0}
+                      </span>
+                    </td>
+                    <td className="py-4">
+                      {upload.errorCount > 0 ? (
+                        <span className="text-red-400">{upload.errorCount}</span>
+                      ) : (
+                        <span className="text-zinc-600">0</span>
+                      )}
+                    </td>
+                    <td className="py-4">
+                      <span className="text-zinc-500 text-sm">
+                        {new Date(upload.createdAt).toLocaleDateString()}
+                      </span>
+                    </td>
+                    <td className="py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => navigate(`/uploads/${upload.id}`)}
+                          className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700/50 transition-all"
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        {upload.status === 'failed' && (
+                          <button
+                            onClick={() => reprocessMutation.mutate(upload.id)}
+                            disabled={reprocessMutation.isPending}
+                            className="p-2 rounded-lg text-zinc-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all disabled:opacity-50"
+                            title="Reprocess"
+                          >
+                            <RotateCcw size={16} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (confirm('Delete this upload?')) {
+                              deleteMutation.mutate(upload.id);
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="p-2 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Upload Wizard Modal */}
+      <UploadWizardModal
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onComplete={() => {
+          setIsWizardOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['uploads'] });
+        }}
+      />
+    </motion.div>
+  );
+}
+
+// Stat Card Component
+function StatCard({ label, value, variant }: { label: string; value: number; variant?: 'blue' | 'green' | 'red' }) {
+  const getBgColor = () => {
+    switch (variant) {
+      case 'blue':
+        return 'border-blue-500/20 bg-blue-500/5';
+      case 'green':
+        return 'border-green-500/20 bg-green-500/5';
+      case 'red':
+        return 'border-red-500/20 bg-red-500/5';
+      default:
+        return 'border-zinc-800 bg-zinc-900/50';
+    }
+  };
+
+  const getTextColor = () => {
+    switch (variant) {
+      case 'blue':
+        return 'text-blue-400';
+      case 'green':
+        return 'text-green-400';
+      case 'red':
+        return 'text-red-400';
+      default:
+        return 'text-white';
+    }
+  };
+
+  return (
+    <div className={`p-4 rounded-xl border ${getBgColor()}`}>
+      <p className="text-zinc-500 text-sm mb-1">{label}</p>
+      <p className={`text-2xl font-light ${getTextColor()}`}>{value}</p>
+    </div>
+  );
+}
+
+export default UploadsPage;

@@ -1,0 +1,6 @@
+external_id,name,email,phone,billing_address,tax_id
+CUST001,Acme Inc,billing@acme.com,+1-555-0100,"123 Main St, New York, NY",12-3456789
+CUST002,TechCorp,finance@techcorp.io,+1-555-0200,"456 Tech Blvd, San Francisco, CA",98-7654321
+CUST003,Global Industries,accounts@globalind.com,+1-555-0300,"789 Global Way, Chicago, IL",55-1234567
+CUST004,StartupXYZ,hello@startupxyz.com,+1-555-0400,"321 Startup Lane, Austin, TX",
+CUST005,Enterprise Solutions,,+1-555-0500,"555 Enterprise Dr, Seattle, WA",44-5678901

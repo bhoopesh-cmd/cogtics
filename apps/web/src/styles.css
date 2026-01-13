@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar - hidden for clean aesthetic */
+::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Selection colors */
+::selection {
+  background: #ff6500;
+  color: black;
+}
+

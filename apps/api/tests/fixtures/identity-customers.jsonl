@@ -1,0 +1,7 @@
+{"id":"cust_stripe_1","name":"Acme Inc.","email":"billing@acme.com","external_id":"cus_stripe_acme","source_system":"stripe","metadata":{"tax_id":"12-3456789","billing_address":"123 Main St, NYC"}}
+{"id":"cust_sf_1","name":"Acme Corporation","email":"contact@acme.com","external_id":"001SF000001","source_system":"salesforce","metadata":{"tax_id":"12-3456789","billing_address":"123 Main Street, New York"}}
+{"id":"cust_stripe_2","name":"TechStart LLC","email":"hello@techstart.io","external_id":"cus_stripe_tech","source_system":"stripe","metadata":{}}
+{"id":"cust_sf_2","name":"Tech Start","email":"sales@techstart.io","external_id":"001SF000002","source_system":"salesforce","metadata":{}}
+{"id":"cust_stripe_3","name":"Global Systems Inc","email":"info@globalsys.com","external_id":"cus_stripe_global","source_system":"stripe","metadata":{"tax_id":"98-7654321"}}
+{"id":"cust_sf_3","name":"Different Company","email":"support@different.org","external_id":"001SF000003","source_system":"salesforce","metadata":{}}
+{"id":"cust_stripe_4","name":"UniqueEntity Co","email":"contact@unique.biz","external_id":"cus_stripe_unique","source_system":"stripe","metadata":{}}

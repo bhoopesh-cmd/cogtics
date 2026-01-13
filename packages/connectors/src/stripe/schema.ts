@@ -1,0 +1,174 @@
+import type { SchemaDefinition, SchemaObject } from '../types.js';
+
+const customerFields = [
+  { name: 'id', type: 'string', required: true },
+  { name: 'email', type: 'string', required: false },
+  { name: 'name', type: 'string', required: false },
+  { name: 'phone', type: 'string', required: false },
+  { name: 'description', type: 'string', required: false },
+  { name: 'created', type: 'integer', required: true },
+  { name: 'metadata', type: 'object', required: false },
+  { name: 'address', type: 'object', required: false },
+  { name: 'balance', type: 'integer', required: false },
+  { name: 'currency', type: 'string', required: false },
+  { name: 'default_source', type: 'string', required: false },
+  { name: 'delinquent', type: 'boolean', required: false },
+  { name: 'invoice_prefix', type: 'string', required: false },
+  { name: 'livemode', type: 'boolean', required: true },
+];
+
+const subscriptionFields = [
+  { name: 'id', type: 'string', required: true },
+  { name: 'customer', type: 'string', required: true },
+  { name: 'status', type: 'string', required: true },
+  { name: 'current_period_start', type: 'integer', required: true },
+  { name: 'current_period_end', type: 'integer', required: true },
+  { name: 'created', type: 'integer', required: true },
+  { name: 'canceled_at', type: 'integer', required: false },
+  { name: 'ended_at', type: 'integer', required: false },
+  { name: 'trial_start', type: 'integer', required: false },
+  { name: 'trial_end', type: 'integer', required: false },
+  { name: 'items', type: 'object', required: true },
+  { name: 'metadata', type: 'object', required: false },
+  { name: 'livemode', type: 'boolean', required: true },
+];
+
+const invoiceFields = [
+  { name: 'id', type: 'string', required: true },
+  { name: 'customer', type: 'string', required: true },
+  { name: 'subscription', type: 'string', required: false },
+  { name: 'status', type: 'string', required: true },
+  { name: 'amount_due', type: 'integer', required: true },
+  { name: 'amount_paid', type: 'integer', required: true },
+  { name: 'amount_remaining', type: 'integer', required: true },
+  { name: 'currency', type: 'string', required: true },
+  { name: 'created', type: 'integer', required: true },
+  { name: 'due_date', type: 'integer', required: false },
+  { name: 'paid', type: 'boolean', required: true },
+  { name: 'period_start', type: 'integer', required: true },
+  { name: 'period_end', type: 'integer', required: true },
+  { name: 'lines', type: 'object', required: true },
+  { name: 'metadata', type: 'object', required: false },
+  { name: 'livemode', type: 'boolean', required: true },
+];
+
+const chargeFields = [
+  { name: 'id', type: 'string', required: true },
+  { name: 'customer', type: 'string', required: false },
+  { name: 'amount', type: 'integer', required: true },
+  { name: 'currency', type: 'string', required: true },
+  { name: 'status', type: 'string', required: true },
+  { name: 'paid', type: 'boolean', required: true },
+  { name: 'refunded', type: 'boolean', required: true },
+  { name: 'created', type: 'integer', required: true },
+  { name: 'description', type: 'string', required: false },
+  { name: 'failure_code', type: 'string', required: false },
+  { name: 'failure_message', type: 'string', required: false },
+  { name: 'payment_intent', type: 'string', required: false },
+  { name: 'payment_method', type: 'string', required: false },
+  { name: 'receipt_url', type: 'string', required: false },
+  { name: 'metadata', type: 'object', required: false },
+  { name: 'livemode', type: 'boolean', required: true },
+];
+
+const refundFields = [
+  { name: 'id', type: 'string', required: true },
+  { name: 'charge', type: 'string', required: true },
+  { name: 'amount', type: 'integer', required: true },
+  { name: 'currency', type: 'string', required: true },
+  { name: 'status', type: 'string', required: true },
+  { name: 'created', type: 'integer', required: true },
+  { name: 'reason', type: 'string', required: false },
+  { name: 'metadata', type: 'object', required: false },
+];
+
+const productFields = [
+  { name: 'id', type: 'string', required: true },
+  { name: 'name', type: 'string', required: true },
+  { name: 'active', type: 'boolean', required: true },
+  { name: 'description', type: 'string', required: false },
+  { name: 'created', type: 'integer', required: true },
+  { name: 'updated', type: 'integer', required: true },
+  { name: 'images', type: 'array', required: false },
+  { name: 'metadata', type: 'object', required: false },
+  { name: 'livemode', type: 'boolean', required: true },
+];
+
+const priceFields = [
+  { name: 'id', type: 'string', required: true },
+  { name: 'product', type: 'string', required: true },
+  { name: 'active', type: 'boolean', required: true },
+  { name: 'currency', type: 'string', required: true },
+  { name: 'unit_amount', type: 'integer', required: false },
+  { name: 'type', type: 'string', required: true },
+  { name: 'billing_scheme', type: 'string', required: true },
+  { name: 'created', type: 'integer', required: true },
+  { name: 'recurring', type: 'object', required: false },
+  { name: 'metadata', type: 'object', required: false },
+  { name: 'livemode', type: 'boolean', required: true },
+];
+
+const STRIPE_OBJECTS: SchemaObject[] = [
+  {
+    name: 'customers',
+    label: 'Customers',
+    fields: customerFields,
+    supportsIncremental: true,
+    incrementalField: 'created',
+  },
+  {
+    name: 'subscriptions',
+    label: 'Subscriptions',
+    fields: subscriptionFields,
+    supportsIncremental: true,
+    incrementalField: 'created',
+  },
+  {
+    name: 'invoices',
+    label: 'Invoices',
+    fields: invoiceFields,
+    supportsIncremental: true,
+    incrementalField: 'created',
+  },
+  {
+    name: 'charges',
+    label: 'Charges',
+    fields: chargeFields,
+    supportsIncremental: true,
+    incrementalField: 'created',
+  },
+  {
+    name: 'refunds',
+    label: 'Refunds',
+    fields: refundFields,
+    supportsIncremental: true,
+    incrementalField: 'created',
+  },
+  {
+    name: 'products',
+    label: 'Products',
+    fields: productFields,
+    supportsIncremental: true,
+    incrementalField: 'created',
+  },
+  {
+    name: 'prices',
+    label: 'Prices',
+    fields: priceFields,
+    supportsIncremental: true,
+    incrementalField: 'created',
+  },
+];
+
+export function getStripeSchema(): SchemaDefinition {
+  return {
+    provider: 'stripe',
+    objects: STRIPE_OBJECTS,
+    discoveredAt: new Date(),
+  };
+}
+
+export function getStripeObjectSchema(objectType: string): SchemaObject | undefined {
+  return STRIPE_OBJECTS.find((obj) => obj.name === objectType);
+}
+
