@@ -12,13 +12,15 @@
   "dependencies": {
     "@cogtics/connectors": "workspace:*",
     "@cogtics/db": "workspace:*",
+    "@cogtics/revrec": "workspace:*",
+    "@cogtics/rules": "workspace:*",
     "@cogtics/schemas": "workspace:*",
     "@cogtics/utils": "workspace:*",
     "bullmq": "^5.1.0",
     "dotenv": "^17.2.3",
     "ioredis": "^5.3.2",
     "papaparse": "^5.5.3",
-    "pdf-parse": "^2.4.5",
+    "pdf-parse": "1.1.1",
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.0"
   },

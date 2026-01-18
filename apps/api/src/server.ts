@@ -5,8 +5,14 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import fastifyStatic from '@fastify/static';
-import { loadApiConfig } from '@cogtics/utils';
-import { createLogger } from '@cogtics/utils';
+import { 
+  loadApiConfig, 
+  createLogger,
+  initTelemetrySync,
+  initMetrics,
+  recordApiRequest,
+  shouldSampleLog,
+} from '@cogtics/utils';
 
 // Plugins
 import { configPlugin } from './plugins/config.js';
@@ -40,6 +46,11 @@ import { contractRoutes } from './routes/contracts/index.js';
 import revrecRoutes from './routes/revrec/index.js';
 // Phase 7 Routes
 import issueRoutes from './routes/issues/index.js';
+// Phase 9 Routes
+import { simulationRoutes } from './routes/simulations/index.js';
+// Phase 10 Routes
+import exportRoutes from './routes/exports/index.js';
+import digestRoutes from './routes/digests/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -47,17 +58,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 // API route prefixes to exclude from SPA fallback
-const API_PREFIXES = ['/api', '/health', '/me', '/admin', '/connections', '/auth', '/snapshots', '/data', '/ingestion', '/identity', '/uploads', '/contracts', '/webhooks', '/revrec', '/issues'];
+const API_PREFIXES = ['/api', '/health', '/me', '/admin', '/connections', '/auth', '/snapshots', '/data', '/ingestion', '/identity', '/uploads', '/contracts', '/webhooks', '/revrec', '/issues', '/simulations', '/exports', '/digests', '/metrics'];
 
 async function main() {
   // Load and validate configuration
   const config = loadApiConfig();
   const isDev = config.NODE_ENV === 'development';
 
-  // Create logger
+  // Initialize OpenTelemetry (Phase 11)
+  const telemetryEnabled = process.env['OTEL_ENABLED'] === 'true';
+  if (telemetryEnabled) {
+    initTelemetrySync({
+      serviceName: 'cogtics-api',
+      serviceVersion: process.env['npm_package_version'] || '0.0.0',
+      environment: config.NODE_ENV,
+      prometheusPort: parseInt(process.env['PROMETHEUS_PORT'] || '9464', 10),
+      otlpEndpoint: process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] || 'http://localhost:4318/v1/traces',
+      enabled: true,
+    });
+    initMetrics('cogtics-api');
+  }
+
+  // Create logger with Loki support
   const logger = createLogger({
     name: 'cogtics-api',
     level: config.LOG_LEVEL,
+    lokiUrl: process.env['LOKI_URL'],
+    enableTraceContext: telemetryEnabled,
   });
 
   // Create Fastify instance
@@ -70,6 +97,24 @@ async function main() {
   // Register core plugins
   await app.register(cors, { origin: true });
   await app.register(sensible);
+
+  // Request timing and metrics hook (Phase 11)
+  app.addHook('onRequest', async (request) => {
+    (request as any).startTime = Date.now();
+  });
+
+  app.addHook('onResponse', async (request, reply) => {
+    const startTime = (request as any).startTime;
+    if (startTime) {
+      const duration = Date.now() - startTime;
+      const route = request.routeOptions?.url || request.url;
+      
+      // Skip logging for sampled paths (health checks, metrics)
+      if (!shouldSampleLog(route)) {
+        recordApiRequest(request.method, route, reply.statusCode, duration);
+      }
+    }
+  });
 
   // Register custom plugins in order
   await app.register(configPlugin);
@@ -103,6 +148,11 @@ async function main() {
   await app.register(revrecRoutes, { prefix: '/revrec' });
   // Phase 7 routes
   await app.register(issueRoutes, { prefix: '/issues' });
+  // Phase 9 routes
+  await app.register(simulationRoutes, { prefix: '/simulations' });
+  // Phase 10 routes
+  await app.register(exportRoutes, { prefix: '/exports' });
+  await app.register(digestRoutes, { prefix: '/digests' });
 
   // Serve frontend (production only - dev uses separate Vite server with proxy)
   if (!isDev) {

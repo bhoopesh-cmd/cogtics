@@ -7,20 +7,59 @@
 import type { ClauseSegment } from './segmentation.js';
 
 export type TermType =
+  // Core pricing and billing
   | 'pricing_model'
   | 'billing_cadence'
   | 'discount'
-  | 'renewal_terms'
-  | 'termination_terms'
-  | 'usage_caps'
+  | 'contract_value'
   | 'payment_terms'
   | 'uplift'
-  | 'auto_renew'
-  | 'notice_period'
-  | 'contract_value'
+  // Dates and terms
   | 'start_date'
   | 'end_date'
-  | 'term_length';
+  | 'term_length'
+  | 'billing_start_date'
+  // Renewal and termination
+  | 'renewal_terms'
+  | 'termination_terms'
+  | 'auto_renew'
+  | 'notice_period'
+  | 'early_termination_fee'
+  | 'termination_notice_period'
+  // Usage and quantity
+  | 'usage_caps'
+  | 'quantity'
+  | 'min_commit'
+  | 'usage_metric'
+  | 'overage_rate'
+  // Pricing complexity
+  | 'unit_price'
+  | 'currency'
+  | 'tiered_pricing'
+  | 'ramp_pricing'
+  | 'credits'
+  | 'implementation_fee'
+  | 'deposit'
+  | 'mfn_clause'
+  // Discount details
+  | 'discount_start'
+  | 'discount_end'
+  | 'discount_cap'
+  | 'discount_stacking'
+  // Timing
+  | 'proration_rule'
+  | 'invoicing_timing'
+  // Tax and legal
+  | 'tax_treatment'
+  | 'withholding_tax'
+  | 'jurisdiction'
+  // True-up
+  | 'true_up_clause'
+  | 'reconciliation_period'
+  // Parties
+  | 'party_customer'
+  | 'party_vendor'
+  | 'party_affiliate';
 
 export type ExtractionMethod = 'rule' | 'pattern' | 'llm';
 
@@ -117,13 +156,28 @@ const EXTRACTION_RULES: ExtractionRule[] = [
       /(\d+(?:\.\d+)?)\s*%\s+off/i,
       /reduced\s+(?:by|rate\s+of)\s+(\d+(?:\.\d+)?)\s*%/i,
       /\$\s*([\d,]+(?:\.\d{2})?)\s+discount/i,
+      // Additional patterns
+      /(\d+(?:\.\d+)?)\s*%\s*(?:volume|early|loyalty|promotional?)\s*discount/i,
+      /discount[:\s]+(\d+(?:\.\d+)?)\s*%/i,
+      /(?:volume|early|loyalty|promotional?)\s+discount[:\s]+(\d+(?:\.\d+)?)\s*%/i,
+      /discount\s+(?:of\s+)?(?:up\s+to\s+)?(\d+(?:\.\d+)?)\s*%/i,
+      /(?:receive|apply|offer(?:ing)?)\s+(?:a\s+)?(\d+(?:\.\d+)?)\s*%\s*discount/i,
     ],
     extractor: (match) => {
       // Try to extract percentage
       const percentMatch = match[0].match(/(\d+(?:\.\d+)?)\s*%/);
       if (percentMatch) {
+        // Try to detect discount type
+        const text = match[0].toLowerCase();
+        let discountType: string | undefined;
+        if (text.includes('volume')) discountType = 'volume';
+        else if (text.includes('early')) discountType = 'early_payment';
+        else if (text.includes('loyalty')) discountType = 'loyalty';
+        else if (text.includes('promotional') || text.includes('promo')) discountType = 'promotional';
+        
         return {
           percentage: parseFloat(percentMatch[1]),
+          discountType,
           description: match[0],
         };
       }
@@ -178,11 +232,18 @@ const EXTRACTION_RULES: ExtractionRule[] = [
   {
     termType: 'payment_terms',
     patterns: [
-      /net\s+(\d+)\s+days?/i,
+      /net\s+(\d+)\s*(?:days?)?/i,
       /payment\s+(?:is\s+)?due\s+(?:within\s+)?(\d+)\s+days?/i,
       /due\s+(?:upon|on)\s+receipt/i,
       /payable\s+(?:within\s+)?(\d+)\s+days?/i,
       /(\d+)\s+days?\s+(?:from\s+)?(?:invoice|receipt)/i,
+      // Additional patterns
+      /payment\s+terms?\s*[:\s]+net\s+(\d+)/i,
+      /payment\s+terms?\s+(?:are|is)\s+net\s+(\d+)/i,
+      /payment\s+(?:within|by)\s+(\d+)\s+days?/i,
+      /terms?\s*[:\s]+net\s+(\d+)/i,
+      /(?:invoice|billing)\s+(?:terms?|payment)\s*[:\s]+net\s+(\d+)/i,
+      /pay(?:ment)?\s+within\s+(\d+)\s+days?/i,
     ],
     extractor: (match) => {
       const text = match[0].toLowerCase();
@@ -383,6 +444,318 @@ const EXTRACTION_RULES: ExtractionRule[] = [
       }
       if (match[0].toLowerCase().includes('cpi')) {
         return { percentage: null, cpiLinked: true, description: match[0] };
+      }
+      return { description: match[0] };
+    },
+    baseConfidence: 0.8,
+  },
+
+  // ============================================
+  // New Term Types (Phase: Contract Intelligence Engine)
+  // ============================================
+
+  // Unit Price
+  {
+    termType: 'unit_price',
+    patterns: [
+      /\$\s*([\d,]+(?:\.\d{2})?)\s*(?:per|\/)\s*(?:user|seat|license|unit)/i,
+      /(?:unit|per[- ]?seat|per[- ]?user)\s+(?:price|fee|cost)[:\s]+\$\s*([\d,]+(?:\.\d{2})?)/i,
+      /(?:price|rate|fee)\s+(?:of|is)\s+\$\s*([\d,]+(?:\.\d{2})?)\s*(?:per|\/)/i,
+    ],
+    extractor: (match) => {
+      const amountMatch = match[0].match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+      if (amountMatch) {
+        return {
+          amount: parseFloat(amountMatch[1].replace(/,/g, '')),
+          currency: 'USD',
+          unit: match[0].match(/(?:per|\/)\s*(\w+)/i)?.[1] || 'unit',
+        };
+      }
+      return { description: match[0] };
+    },
+    baseConfidence: 0.85,
+  },
+
+  // Currency
+  {
+    termType: 'currency',
+    patterns: [
+      /(?:payable|paid|denominated)\s+in\s+(USD|EUR|GBP|CAD|AUD|JPY|CHF)/i,
+      /(?:all\s+)?(?:amounts?|fees?|prices?)\s+(?:are\s+)?in\s+(USD|EUR|GBP|CAD|AUD|JPY|CHF|United\s+States\s+Dollars?)/i,
+      /\((USD|EUR|GBP|CAD|AUD|JPY|CHF)\)/,
+    ],
+    extractor: (match) => {
+      const currencyMatch = match[1] || match[0].match(/(USD|EUR|GBP|CAD|AUD|JPY|CHF)/i)?.[1];
+      return { currency: currencyMatch?.toUpperCase() || 'USD' };
+    },
+    baseConfidence: 0.9,
+  },
+
+  // Quantity / Seat Count
+  {
+    termType: 'quantity',
+    patterns: [
+      /([\d,]+)\s+(?:users?|seats?|licenses?|subscriptions?)/i,
+      /(?:quantity|qty)[:\s]+([\d,]+)/i,
+      /(?:initial|minimum|committed)\s+(?:quantity|seats?|users?)[:\s]*([\d,]+)/i,
+    ],
+    extractor: (match) => {
+      const qty = match[0].match(/([\d,]+)/);
+      if (qty) {
+        return {
+          quantity: parseInt(qty[1].replace(/,/g, ''), 10),
+          unit: match[0].match(/(?:users?|seats?|licenses?|subscriptions?)/i)?.[0] || 'units',
+        };
+      }
+      return { description: match[0] };
+    },
+    baseConfidence: 0.8,
+  },
+
+  // Minimum Commitment
+  {
+    termType: 'min_commit',
+    patterns: [
+      /minimum\s+(?:annual\s+)?commit(?:ment)?[:\s]+\$?\s*([\d,]+(?:\.\d{2})?)/i,
+      /(?:mac|amc|minimum\s+annual\s+(?:commitment|contract))[:\s]+\$?\s*([\d,]+(?:\.\d{2})?)/i,
+      /commit(?:ted)?\s+to\s+(?:a\s+)?minimum\s+(?:of\s+)?\$?\s*([\d,]+)/i,
+    ],
+    extractor: (match) => {
+      const amount = match[0].match(/\$?\s*([\d,]+(?:\.\d{2})?)/);
+      if (amount) {
+        return {
+          amount: parseFloat(amount[1].replace(/,/g, '')),
+          currency: 'USD',
+        };
+      }
+      return { description: match[0] };
+    },
+    baseConfidence: 0.85,
+  },
+
+  // Overage Rate
+  {
+    termType: 'overage_rate',
+    patterns: [
+      /overage\s+(?:rate|price|fee)[:\s]+\$\s*([\d,]+(?:\.\d{2})?)/i,
+      /excess\s+usage\s+(?:at|charged\s+at)\s+\$\s*([\d,]+(?:\.\d{2})?)/i,
+      /(?:above|beyond)\s+(?:the\s+)?(?:cap|limit|commitment)[^.]*\$\s*([\d,]+(?:\.\d{2})?)/i,
+    ],
+    extractor: (match) => {
+      const amount = match[0].match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+      if (amount) {
+        return {
+          amount: parseFloat(amount[1].replace(/,/g, '')),
+          currency: 'USD',
+        };
+      }
+      return { description: match[0] };
+    },
+    baseConfidence: 0.8,
+  },
+
+  // Early Termination Fee
+  {
+    termType: 'early_termination_fee',
+    patterns: [
+      /early\s+termination\s+fee[:\s]+\$?\s*([\d,]+(?:\.\d{2})?)/i,
+      /termination\s+(?:for\s+convenience\s+)?fee[:\s]+\$?\s*([\d,]+(?:\.\d{2})?)/i,
+      /(?:shall|will)\s+pay\s+(?:a\s+)?(?:early\s+)?termination\s+fee/i,
+      /(?:remaining|unpaid)\s+(?:balance|amounts?)\s+(?:shall\s+)?(?:become\s+)?(?:due|payable)/i,
+    ],
+    extractor: (match) => {
+      const amount = match[0].match(/\$?\s*([\d,]+(?:\.\d{2})?)/);
+      if (amount) {
+        return {
+          amount: parseFloat(amount[1].replace(/,/g, '')),
+          currency: 'USD',
+        };
+      }
+      return { hasEarlyTerminationFee: true, description: match[0] };
+    },
+    baseConfidence: 0.8,
+  },
+
+  // Credits
+  {
+    termType: 'credits',
+    patterns: [
+      /credit\s+(?:of\s+)?\$\s*([\d,]+(?:\.\d{2})?)/i,
+      /\$\s*([\d,]+(?:\.\d{2})?)\s+(?:service\s+)?credit/i,
+      /(?:one[- ]?time|promotional|signing)\s+credit/i,
+      /(?:free|complimentary)\s+(?:months?|days?|period)/i,
+    ],
+    extractor: (match) => {
+      const amount = match[0].match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+      if (amount) {
+        return {
+          amount: parseFloat(amount[1].replace(/,/g, '')),
+          currency: 'USD',
+        };
+      }
+      return { hasCredits: true, description: match[0] };
+    },
+    baseConfidence: 0.75,
+  },
+
+  // Implementation Fee
+  {
+    termType: 'implementation_fee',
+    patterns: [
+      /implementation\s+(?:fee|cost|charge)[:\s]+\$\s*([\d,]+(?:\.\d{2})?)/i,
+      /(?:setup|onboarding|professional\s+services?)\s+(?:fee|cost)[:\s]+\$\s*([\d,]+(?:\.\d{2})?)/i,
+      /one[- ]?time\s+(?:implementation|setup)\s+(?:fee|charge)/i,
+    ],
+    extractor: (match) => {
+      const amount = match[0].match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+      if (amount) {
+        return {
+          amount: parseFloat(amount[1].replace(/,/g, '')),
+          currency: 'USD',
+          isOneTime: true,
+        };
+      }
+      return { description: match[0] };
+    },
+    baseConfidence: 0.85,
+  },
+
+  // Tax Treatment
+  {
+    termType: 'tax_treatment',
+    patterns: [
+      /(?:fees?\s+)?(?:are\s+)?(?:exclusive|inclusive)\s+of\s+(?:all\s+)?(?:applicable\s+)?taxes/i,
+      /plus\s+(?:applicable\s+)?(?:sales\s+)?tax(?:es)?/i,
+      /(?:vat|gst|sales\s+tax)\s+(?:is\s+)?(?:not\s+)?included/i,
+      /(?:customer|you)\s+(?:shall|will)\s+(?:be\s+)?responsible\s+for\s+(?:all\s+)?taxes/i,
+      /tax[- ]?exempt/i,
+    ],
+    extractor: (match) => {
+      const text = match[0].toLowerCase();
+      return {
+        taxesIncluded: text.includes('inclusive'),
+        taxesExcluded: text.includes('exclusive') || text.includes('plus'),
+        taxExempt: text.includes('exempt'),
+        description: match[0],
+      };
+    },
+    baseConfidence: 0.85,
+  },
+
+  // True-up Clause
+  {
+    termType: 'true_up_clause',
+    patterns: [
+      /true[- ]?up\s+(?:provision|clause|process|review)/i,
+      /(?:annual|quarterly|periodic)\s+true[- ]?up/i,
+      /reconcili(?:ation|e)\s+(?:of\s+)?(?:usage|licenses?|seats?)/i,
+      /adjust(?:ment)?\s+(?:based\s+on\s+)?actual\s+(?:usage|consumption)/i,
+    ],
+    extractor: (match) => {
+      return { hasTrueUp: true, description: match[0] };
+    },
+    baseConfidence: 0.8,
+  },
+
+  // MFN Clause (Most Favored Nation)
+  {
+    termType: 'mfn_clause',
+    patterns: [
+      /most\s+favou?red\s+(?:nation|customer|pricing)/i,
+      /mfn\s+(?:clause|provision|pricing)/i,
+      /(?:no\s+)?(?:less\s+)?favou?rable\s+(?:terms?|pricing|rates?)\s+(?:than|as)/i,
+      /price\s+parity/i,
+    ],
+    extractor: (match) => {
+      return { hasMFN: true, description: match[0] };
+    },
+    baseConfidence: 0.85,
+  },
+
+  // Proration Rule
+  {
+    termType: 'proration_rule',
+    patterns: [
+      /prorat(?:ed?|ion)\s+(?:basis|calculation|charges?)/i,
+      /partial\s+(?:month|period)\s+(?:will\s+be\s+)?prorat/i,
+      /(?:fees?\s+)?(?:will\s+be\s+)?calculated\s+on\s+a\s+pro[- ]?rata\s+basis/i,
+      /no\s+proration/i,
+    ],
+    extractor: (match) => {
+      const text = match[0].toLowerCase();
+      return {
+        hasProration: !text.includes('no proration'),
+        description: match[0],
+      };
+    },
+    baseConfidence: 0.8,
+  },
+
+  // Invoicing Timing
+  {
+    termType: 'invoicing_timing',
+    patterns: [
+      /invoic(?:ed?|ing)\s+(?:in\s+)?advance/i,
+      /invoic(?:ed?|ing)\s+(?:in\s+)?arrears/i,
+      /(?:fees?\s+)?(?:are\s+)?(?:billed?|invoiced?)\s+(?:at\s+the\s+)?(?:beginning|end)\s+of/i,
+      /(?:pre-?paid|post-?paid)/i,
+    ],
+    extractor: (match) => {
+      const text = match[0].toLowerCase();
+      return {
+        timing: text.includes('advance') || text.includes('pre') ? 'advance' : 'arrears',
+        description: match[0],
+      };
+    },
+    baseConfidence: 0.85,
+  },
+
+  // Party - Customer
+  {
+    termType: 'party_customer',
+    patterns: [
+      /(?:customer|licensee|subscriber|client)\s*[:\(]?\s*["']?([A-Z][A-Za-z\s&.,]+(?:Inc\.?|LLC|Ltd\.?|Corp\.?|Corporation|Company|Co\.?)?)["']?/i,
+      /(?:between|by\s+and\s+between)[^.]*?(?:and|,)\s*["']?([A-Z][A-Za-z\s&.,]+(?:Inc\.?|LLC|Ltd\.?|Corp\.?))["']?\s*\(?["']?(?:customer|licensee|client)/i,
+    ],
+    extractor: (match) => {
+      const name = match[1]?.trim();
+      if (name && name.length > 2 && name.length < 200) {
+        return { name, role: 'customer' };
+      }
+      return { description: match[0] };
+    },
+    baseConfidence: 0.7,
+  },
+
+  // Party - Vendor
+  {
+    termType: 'party_vendor',
+    patterns: [
+      /(?:vendor|provider|licensor|supplier|company)\s*[:\(]?\s*["']?([A-Z][A-Za-z\s&.,]+(?:Inc\.?|LLC|Ltd\.?|Corp\.?|Corporation|Company|Co\.?)?)["']?/i,
+      /(?:between|by\s+and\s+between)\s*["']?([A-Z][A-Za-z\s&.,]+(?:Inc\.?|LLC|Ltd\.?|Corp\.?))["']?\s*\(?["']?(?:vendor|provider|company)/i,
+    ],
+    extractor: (match) => {
+      const name = match[1]?.trim();
+      if (name && name.length > 2 && name.length < 200) {
+        return { name, role: 'vendor' };
+      }
+      return { description: match[0] };
+    },
+    baseConfidence: 0.7,
+  },
+
+  // Jurisdiction
+  {
+    termType: 'jurisdiction',
+    patterns: [
+      /govern(?:ed|ing)\s+(?:by\s+)?(?:the\s+)?laws?\s+of\s+(?:the\s+)?(?:State\s+of\s+)?([A-Z][A-Za-z\s]+)/i,
+      /(?:exclusive\s+)?jurisdiction\s+(?:of\s+)?(?:the\s+)?(?:courts?\s+of\s+)?([A-Z][A-Za-z\s,]+)/i,
+      /venue\s+(?:shall\s+be\s+)?(?:in\s+)?([A-Z][A-Za-z\s,]+)/i,
+    ],
+    extractor: (match) => {
+      const jurisdiction = match[1]?.trim();
+      if (jurisdiction && jurisdiction.length > 2) {
+        return { jurisdiction };
       }
       return { description: match[0] };
     },

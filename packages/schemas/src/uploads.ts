@@ -118,6 +118,7 @@ export const StartUploadRequestSchema = z.object({
   type: UploadTypeSchema,
   fileName: z.string().min(1).max(255),
   contentType: z.string().min(1),
+  fileSize: z.number().int().nonnegative().optional(),
   entityType: UploadEntityTypeSchema.optional(),
   displayName: z.string().max(255).optional(),
 });

@@ -15,7 +15,18 @@ import {
 import {
   DetectRunJobPayloadSchema,
   DetectReplayJobPayloadSchema,
+  EvidenceGenerateJobPayloadSchema,
+  EvidenceRegenerateJobPayloadSchema,
 } from './detection.js';
+import {
+  SimulationRunJobPayloadSchema,
+  SimulationReplayJobPayloadSchema,
+} from './simulation.js';
+import {
+  ExportCsvGenerateJobPayloadSchema,
+  ExportPdfRenderJobPayloadSchema,
+  DigestSendJobPayloadSchema,
+} from './exports.js';
 
 // Job status enum
 export const JobStatusSchema = z.enum(['pending', 'processing', 'completed', 'failed', 'cancelled']);
@@ -48,6 +59,16 @@ export const QueueNameSchema = z.enum([
   // Phase 7 detection engine jobs
   'detect.run',
   'detect.replay',
+  // Phase 8 evidence generation jobs
+  'evidence.generate',
+  'evidence.regenerate',
+  // Phase 9 simulation engine jobs
+  'simulation.run',
+  'simulation.replay',
+  // Phase 10 exports & digests jobs
+  'export.csv.generate',
+  'export.pdf.render',
+  'digest.send',
 ]);
 export type QueueName = z.infer<typeof QueueNameSchema>;
 
@@ -191,6 +212,16 @@ export const JobPayloadSchema = z.discriminatedUnion('type', [
   // Phase 7 detection engine jobs
   DetectRunJobPayloadSchema,
   DetectReplayJobPayloadSchema,
+  // Phase 8 evidence generation jobs
+  EvidenceGenerateJobPayloadSchema,
+  EvidenceRegenerateJobPayloadSchema,
+  // Phase 9 simulation engine jobs
+  SimulationRunJobPayloadSchema,
+  SimulationReplayJobPayloadSchema,
+  // Phase 10 exports & digests jobs
+  ExportCsvGenerateJobPayloadSchema,
+  ExportPdfRenderJobPayloadSchema,
+  DigestSendJobPayloadSchema,
 ]);
 
 export type LegacySyncJobPayload = z.infer<typeof LegacySyncJobPayloadSchema>;

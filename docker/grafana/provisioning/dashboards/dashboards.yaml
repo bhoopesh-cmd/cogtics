@@ -1,0 +1,16 @@
+# Grafana Dashboard Provisioning (Phase 11)
+# Auto-loads dashboard JSON files from the dashboards folder
+
+apiVersion: 1
+
+providers:
+  - name: 'Cogtics Dashboards'
+    orgId: 1
+    folder: 'Cogtics'
+    folderUid: 'cogtics'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

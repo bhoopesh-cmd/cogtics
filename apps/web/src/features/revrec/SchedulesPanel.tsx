@@ -40,13 +40,14 @@ export function SchedulesPanel({ snapshotId }: SchedulesPanelProps) {
         periodStart = now.toISOString().split('T')[0];
       }
 
-      const data = await listRevRecSchedules({ 
+      const res = await listRevRecSchedules({ 
         snapshotId, 
         periodStart,
         periodEnd,
         limit: 100,
       });
-      setSchedules(data.schedules);
+      if (!res.ok) throw new Error(res.error);
+      setSchedules(res.data.schedules || []);
     } catch (err) {
       console.error('Failed to load schedules:', err);
     } finally {

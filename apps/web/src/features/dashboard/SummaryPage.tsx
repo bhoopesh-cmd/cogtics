@@ -130,39 +130,51 @@ export function SummaryPage() {
   const queryClient = useQueryClient();
 
   // Fetch summary stats from API
-  const { data: statsResponse, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useQuery({
+  const { data: stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useQuery({
     queryKey: ['summary-stats'],
-    queryFn: () => getSummaryStats(),
+    queryFn: async () => {
+      const res = await getSummaryStats();
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     staleTime: 30000, // 30 seconds
   });
-  const stats = statsResponse?.data;
 
   // Fetch latest snapshot info
-  const { data: snapshotResponse, isLoading: snapshotLoading } = useQuery({
+  const { data: latestSnapshot, isLoading: snapshotLoading } = useQuery({
     queryKey: ['latest-snapshot'],
-    queryFn: () => getLatestSnapshot(),
+    queryFn: async () => {
+      const res = await getLatestSnapshot();
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     staleTime: 30000,
     retry: false, // Don't retry if no snapshot
   });
-  const latestSnapshot = snapshotResponse?.data;
 
   // Fetch recent invoices for the chart
-  const { data: invoicesResponse } = useQuery({
+  const { data: invoicesData } = useQuery({
     queryKey: ['recent-invoices'],
-    queryFn: () => listInvoices({ limit: 12 }),
+    queryFn: async () => {
+      const res = await listInvoices({ limit: 12 });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     enabled: !!stats,
     staleTime: 30000,
   });
-  const invoicesData = invoicesResponse?.data;
 
   // Fetch recent contracts for simulations
-  const { data: contractsResponse } = useQuery({
+  const { data: contractsData } = useQuery({
     queryKey: ['recent-contracts'],
-    queryFn: () => listContracts({ limit: 5, status: 'active' }),
+    queryFn: async () => {
+      const res = await listContracts({ limit: 5, status: 'active' });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     enabled: !!stats,
     staleTime: 30000,
   });
-  const contractsData = contractsResponse?.data;
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['summary-stats'] });

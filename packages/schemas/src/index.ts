@@ -119,4 +119,62 @@ export {
   type DetectRunJobPayload,
   DetectReplayJobPayloadSchema,
   type DetectReplayJobPayload,
+  // Phase 8: Evidence Generation
+  // ID generators
+  generateEvidenceId,
+  generateEvidenceSourceId,
+  generateEvidenceCalcId,
+  generateEvidenceClauseId,
+  generateEvidenceAuditId,
+  generateEvidenceRunId,
+  // Evidence enums
+  EvidenceTypeSchema,
+  type EvidenceType,
+  EvidenceSourceTypeSchema,
+  type EvidenceSourceType,
+  CalculationTypeSchema,
+  type CalculationType,
+  EvidenceActionSchema,
+  type EvidenceAction,
+  EvidenceTriggerTypeSchema,
+  type EvidenceTriggerType,
+  CompletenessCategory,
+  // Evidence schemas
+  IssueEvidenceSchema,
+  type IssueEvidence,
+  IssueEvidenceSourceSchema,
+  type IssueEvidenceSource,
+  IssueEvidenceCalculationSchema,
+  type IssueEvidenceCalculation,
+  IssueEvidenceClauseSchema,
+  type IssueEvidenceClause,
+  IssueEvidenceAuditSchema,
+  type IssueEvidenceAudit,
+  EvidenceGenerationRunSchema,
+  type EvidenceGenerationRun,
+  // Evidence pack
+  CalculationStepSchema,
+  type CalculationStep,
+  EvidencePackSchema,
+  type EvidencePack,
+  // Evidence API schemas
+  GetEvidenceQuerySchema,
+  type GetEvidenceQuery,
+  RegenerateEvidenceRequestSchema,
+  type RegenerateEvidenceRequest,
+  EvidenceResponseSchema,
+  type EvidenceResponse,
+  EvidenceSummaryResponseSchema,
+  type EvidenceSummaryResponse,
+  // Evidence job payloads
+  EvidenceGenerateJobPayloadSchema,
+  type EvidenceGenerateJobPayload,
+  EvidenceRegenerateJobPayloadSchema,
+  type EvidenceRegenerateJobPayload,
 } from './detection.js';
+
+// Simulation engine schemas (Phase 9)
+export * from './simulation.js';
+
+// Exports & Digests schemas (Phase 10)
+export * from './exports.js';

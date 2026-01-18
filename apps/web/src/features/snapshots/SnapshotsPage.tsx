@@ -24,7 +24,11 @@ export function SnapshotsPage() {
   // Fetch snapshots
   const { data: snapshotsData, isLoading, refetch } = useQuery({
     queryKey: ['snapshots', { limit: 20 }],
-    queryFn: () => listSnapshots({ limit: 20 }),
+    queryFn: async () => {
+      const res = await listSnapshots({ limit: 20 });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     refetchInterval: 10000, // Poll for updates
   });
 
@@ -32,7 +36,11 @@ export function SnapshotsPage() {
 
   // Trigger snapshot mutation
   const triggerMutation = useMutation({
-    mutationFn: () => triggerSnapshot({ runType: 'incremental' }),
+    mutationFn: async () => {
+      const res = await triggerSnapshot({ runType: 'incremental' });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['snapshots'] });
     },
@@ -212,7 +220,11 @@ function SnapshotRow({
 function SnapshotDetail({ snapshotId, onClose }: { snapshotId: string; onClose: () => void }) {
   const { data: snapshotData, isLoading } = useQuery({
     queryKey: ['snapshot', snapshotId],
-    queryFn: () => getSnapshot(snapshotId),
+    queryFn: async () => {
+      const res = await getSnapshot(snapshotId);
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     refetchInterval: 5000,
   });
 

@@ -18,7 +18,7 @@ interface JobResult {
 }
 
 interface StorageClient {
-  getObject(key: string): Promise<{ Body: NodeJS.ReadableStream | null }>;
+  get(key: string): Promise<Buffer>;
 }
 
 /**
@@ -45,24 +45,15 @@ export async function processContractExtractJob(
 
   try {
     // Download PDF from S3
-    const s3Object = await storage.getObject(s3Key);
-    if (!s3Object.Body) {
-      throw new Error('Empty file body from S3');
+    const pdfBuffer = await storage.get(s3Key);
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error('Empty file from S3');
     }
-
-    // Read stream to buffer
-    const chunks: Buffer[] = [];
-    let totalSize = 0;
-    const MAX_PDF_SIZE = 50 * 1024 * 1024; // 50MB limit
     
-    for await (const chunk of s3Object.Body as AsyncIterable<Buffer>) {
-      totalSize += chunk.length;
-      if (totalSize > MAX_PDF_SIZE) {
-        throw new Error(`PDF file too large (>${MAX_PDF_SIZE / 1024 / 1024}MB). Please upload a smaller file.`);
-      }
-      chunks.push(chunk);
+    const MAX_PDF_SIZE = 50 * 1024 * 1024; // 50MB limit
+    if (pdfBuffer.length > MAX_PDF_SIZE) {
+      throw new Error(`PDF file too large (>${MAX_PDF_SIZE / 1024 / 1024}MB). Please upload a smaller file.`);
     }
-    const pdfBuffer = Buffer.concat(chunks);
 
     // Extract text from PDF using pdf-parse
     let extractedText = '';

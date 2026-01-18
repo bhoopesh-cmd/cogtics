@@ -26,6 +26,30 @@ export function createReadinessId(): string {
   return `crdy_${nanoid(16)}`;
 }
 
+export function createBundleId(): string {
+  return `bndl_${nanoid(16)}`;
+}
+
+export function createTermConflictId(): string {
+  return `tcnf_${nanoid(16)}`;
+}
+
+export function createReviewQueueItemId(): string {
+  return `rvqi_${nanoid(16)}`;
+}
+
+export function createDefinedTermId(): string {
+  return `dtrm_${nanoid(16)}`;
+}
+
+export function createOverrideClauseId(): string {
+  return `ovrc_${nanoid(16)}`;
+}
+
+export function createConflictCandidateId(): string {
+  return `ccnd_${nanoid(16)}`;
+}
+
 // Note: createContractTermId is already exported from ids.ts
 
 // ============================================
@@ -61,6 +85,56 @@ export type ReadinessStatus = z.infer<typeof ReadinessStatusSchema>;
 
 export const DocumentStatusSchema = z.enum(['pending', 'extracting', 'extracted', 'failed']);
 export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
+
+export const DocumentTypeSchema = z.enum([
+  'msa', 'order_form', 'amendment', 'sow', 'addendum', 
+  'exhibit', 'schedule', 'renewal', 'termination', 'other'
+]);
+export type DocumentType = z.infer<typeof DocumentTypeSchema>;
+
+export const OverrideTypeSchema = z.enum([
+  'notwithstanding', 'except_as', 'prevails_over', 'controls',
+  'supersedes', 'in_event_of_conflict', 'explicit_precedence'
+]);
+export type OverrideType = z.infer<typeof OverrideTypeSchema>;
+
+export const ConflictStatusSchema = z.enum([
+  'pending', 'auto_resolved', 'human_resolved', 'accepted', 'escalated'
+]);
+export type ConflictStatus = z.infer<typeof ConflictStatusSchema>;
+
+export const ResolutionMethodSchema = z.enum([
+  'auto_precedence', 'human_review', 'llm_suggestion', 'manual_override'
+]);
+export type ResolutionMethod = z.infer<typeof ResolutionMethodSchema>;
+
+export const ReviewItemTypeSchema = z.enum([
+  'low_confidence_term', 'conflict', 'missing_required_term',
+  'validation_error', 'llm_extraction', 'ocr_required'
+]);
+export type ReviewItemType = z.infer<typeof ReviewItemTypeSchema>;
+
+export const ReviewStatusSchema = z.enum([
+  'pending', 'in_review', 'resolved', 'skipped', 'escalated'
+]);
+export type ReviewStatus = z.infer<typeof ReviewStatusSchema>;
+
+export const ValidationStatusSchema = z.enum(['valid', 'warning', 'error']);
+export type ValidationStatus = z.infer<typeof ValidationStatusSchema>;
+
+// Document type precedence order (lower = higher precedence)
+export const DOCUMENT_TYPE_PRECEDENCE: Record<DocumentType, number> = {
+  'amendment': 1,
+  'order_form': 2,
+  'addendum': 3,
+  'msa': 4,
+  'sow': 5,
+  'exhibit': 6,
+  'schedule': 7,
+  'renewal': 8,
+  'termination': 9,
+  'other': 10,
+};
 
 // ============================================
 // Term Type Configurations

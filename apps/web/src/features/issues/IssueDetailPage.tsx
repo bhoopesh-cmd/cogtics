@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import * as api from '@/lib/api/endpoints';
 import type { IssueDetail, IssueStatus } from '@/lib/api/endpoints';
+import { EvidencePanel } from './EvidencePanel';
 
 const STATUS_ACTIONS: { status: IssueStatus; label: string; color: string }[] = [
   { status: 'acknowledged', label: 'Acknowledge', color: 'bg-blue-600 hover:bg-blue-500' },
@@ -30,8 +31,9 @@ export function IssueDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const data = await api.getIssue(id);
-      setIssue(data);
+      const res = await api.getIssue(id);
+      if (!res.ok) throw new Error(res.error);
+      setIssue(res.data);
     } catch (err) {
       console.error('Failed to load issue:', err);
     } finally {
@@ -43,7 +45,8 @@ export function IssueDetailPage() {
     if (!id) return;
     
     try {
-      await api.updateIssueStatus(id, status, reason || undefined);
+      const res = await api.updateIssueStatus(id, status, reason || undefined);
+      if (!res.ok) throw new Error(res.error);
       setShowReasonInput(false);
       setReason('');
       setPendingStatus(null);
@@ -233,6 +236,9 @@ export function IssueDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Phase 8: Evidence Pack */}
+          <EvidencePanel issueId={issue.id} isAdmin={true} />
         </div>
 
         {/* Right Column - Metadata */}

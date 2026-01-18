@@ -41,8 +41,9 @@ export function RevRecDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getRevRecSummary();
-      setSummary(data);
+      const res = await getRevRecSummary();
+      if (!res.ok) throw new Error(res.error);
+      setSummary(res.data);
     } catch (err) {
       setError('Failed to load rev-rec summary');
       console.error(err);
@@ -56,7 +57,8 @@ export function RevRecDashboardPage() {
     
     setComputing(true);
     try {
-      await triggerRevRecCompute(summary.snapshotId, { forceRecompute: true });
+      const res = await triggerRevRecCompute(summary.snapshotId, { forceRecompute: true });
+      if (!res.ok) throw new Error(res.error);
       // Reload summary after a delay to see results
       setTimeout(loadSummary, 2000);
     } catch (err) {

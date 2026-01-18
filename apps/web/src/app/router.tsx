@@ -27,10 +27,18 @@ import { UploadsPage } from '@/features/uploads/UploadsPage';
 import { UploadDetailPage } from '@/features/uploads/UploadDetailPage';
 // Phase 5 pages
 import { ContractIntelligencePage } from '@/features/contracts/ContractIntelligencePage';
+import { ReviewQueuePage } from '@/features/contracts';
 // Phase 6 pages
 import { RevRecDashboardPage } from '@/features/revrec/RevRecDashboardPage';
 // Phase 7 pages
 import { IssuesPage as IssuesPageV2, IssueDetailPage, DetectionRunsPage } from '@/features/issues';
+// Phase 9 pages
+import { SimulationDetailPage } from '@/features/simulations';
+// Phase 10 pages
+import { DigestSettingsPage } from '@/features/digests';
+// Phase 11 pages
+import { DLQPage } from '@/features/admin/DLQPage';
+import { SystemHealthPage } from '@/features/admin/SystemHealthPage';
 
 function ProtectedRoutes() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -57,7 +65,9 @@ function ProtectedRoutes() {
         <Route path="/contracts" element={<ContractsPage />} />
         <Route path="/revrec" element={<RevRecPage />} />
         <Route path="/simulations" element={<SimulationsPage />} />
+        <Route path="/simulations/:id" element={<SimulationDetailPage />} />
         <Route path="/exports" element={<ExportsPage />} />
+        <Route path="/digests" element={<DigestSettingsPage />} />
         <Route path="/data" element={<DataExplorerPage />} />
         <Route path="/data/customers/:customerId" element={<CustomerDetailPage />} />
         <Route path="/data/contracts/:contractId" element={<ContractDetailPage />} />
@@ -66,6 +76,9 @@ function ProtectedRoutes() {
         <Route path="/settings/jobs" element={<JobsPage />} />
         <Route path="/settings/audit" element={<AuditPage />} />
         <Route path="/settings/snapshots" element={<SnapshotsPage />} />
+        {/* Phase 11 Admin Routes */}
+        <Route path="/admin/health" element={<SystemHealthPage />} />
+        <Route path="/admin/dlq" element={<DLQPage />} />
         {/* Phase 3 Identity Routes */}
         <Route path="/identity/queue" element={<IdentityQueuePage />} />
         <Route path="/identity/resolved" element={<ResolvedCustomersPage />} />
@@ -74,6 +87,7 @@ function ProtectedRoutes() {
         <Route path="/uploads/:uploadId" element={<UploadDetailPage />} />
         {/* Phase 5 Contract Intelligence Routes */}
         <Route path="/contracts/:contractId/intelligence" element={<ContractIntelligencePage />} />
+        <Route path="/contracts/review" element={<ReviewQueuePage />} />
         {/* Phase 6 Revenue Recognition Routes */}
         <Route path="/revrec" element={<RevRecDashboardPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

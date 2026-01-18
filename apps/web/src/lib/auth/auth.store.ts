@@ -16,22 +16,35 @@ export interface AuthState {
 }
 
 export function getStoredToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    // localStorage not available (incognito mode, storage blocked, etc.)
+    return null;
+  }
 }
 
 export function setStoredToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // localStorage not available
+  }
 }
 
 export function clearStoredToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  } catch {
+    // localStorage not available
+  }
 }
 
 export function getStoredUser(): AuthUser | null {
-  const data = localStorage.getItem(USER_KEY);
-  if (!data) return null;
   try {
+    const data = localStorage.getItem(USER_KEY);
+    if (!data) return null;
     return JSON.parse(data) as AuthUser;
   } catch {
     return null;
@@ -39,6 +52,10 @@ export function getStoredUser(): AuthUser | null {
 }
 
 export function setStoredUser(user: AuthUser): void {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  try {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {
+    // localStorage not available
+  }
 }
 

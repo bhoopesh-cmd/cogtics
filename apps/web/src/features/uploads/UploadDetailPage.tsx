@@ -17,7 +17,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { getUploadDetail, getUploadErrors, reprocessUpload, deleteUpload } from '@/lib/api/endpoints';
-import DecorativeDots from '@/components/ui/DecorativeDots';
 
 export function UploadDetailPage() {
   const { uploadId } = useParams<{ uploadId: string }>();
@@ -228,8 +227,7 @@ export function UploadDetailPage() {
       )}
 
       {/* Files */}
-      <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-6 relative overflow-hidden">
-        <DecorativeDots position="topRight" />
+      <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-6">
         <h2 className="text-lg font-medium text-white mb-4">Files</h2>
         
         <table className="w-full">
@@ -254,8 +252,7 @@ export function UploadDetailPage() {
 
       {/* Parse Runs */}
       {upload.parseRuns && upload.parseRuns.length > 0 && (
-        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-6 relative overflow-hidden">
-          <DecorativeDots position="topRight" />
+        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-6">
           <h2 className="text-lg font-medium text-white mb-4">Parse History</h2>
           
           <table className="w-full">
@@ -295,8 +292,7 @@ export function UploadDetailPage() {
 
       {/* Errors Table */}
       {totalErrors > 0 && (
-        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-6 relative overflow-hidden">
-          <DecorativeDots position="topRight" />
+        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-medium text-white">Parse Errors ({totalErrors})</h2>
             
@@ -389,11 +385,12 @@ function StatCard({ label, value, variant }: { label: string; value: number; var
   );
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
+function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return '-';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  if (i < 0) return `${bytes} B`;
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 

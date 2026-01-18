@@ -36,3 +36,44 @@ docker/data/
 # Repo-specific
 .website/
 nodemodules/
+
+# Caches
+.eslintcache
+.cache/
+.turbo/
+
+# pnpm
+pnpm-debug.log*
+
+# Runtime/Process
+*.pid
+*.pid.lock
+
+# Secrets (extra protection)
+*.pem
+*.key
+credentials.json
+
+# Temporary files
+tmp/
+.tmp/
+*.tmp
+
+# Package files
+*.tgz
+
+# Editor directories
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Test artifacts
+.nyc_output/
+junit.xml
+test-results/
+
+# Terraform (if used)
+.terraform/
+*.tfstate*

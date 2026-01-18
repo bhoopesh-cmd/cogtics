@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { useMutation } from '@tanstack/react-query';
-import { startCsvUpload, completeCsvUpload, startPdfUpload, completePdfUpload } from '@/lib/api/endpoints';
+import { startCsvUpload, completeCsvUpload, startPdfUpload, completePdfUpload, deleteUpload } from '@/lib/api/endpoints';
 
 interface UploadWizardModalProps {
   isOpen: boolean;
@@ -24,6 +24,10 @@ interface UploadWizardModalProps {
 type UploadStep = 'select-type' | 'upload-file' | 'configure-mapping' | 'review';
 type UploadType = 'csv' | 'pdf';
 
+// Upload limits
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const MAX_FILES = 10;
+
 interface ColumnMapping {
   sourceColumn: string;
   targetField: string;
@@ -33,66 +37,48 @@ interface ColumnMapping {
 export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardModalProps) {
   const [step, setStep] = useState<UploadStep>('select-type');
   const [uploadType, setUploadType] = useState<UploadType | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [entityType, setEntityType] = useState<string>('customer');
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadId, setUploadId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [uploadIds, setUploadIds] = useState<string[]>([]);
+  const [currentUploadIndex, setCurrentUploadIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
 
-  // Start CSV upload mutation
-  const startCsvMutation = useMutation({
-    mutationFn: async () => {
-      if (!file) throw new Error('No file selected');
-      const res = await startCsvUpload({
-        fileName: file.name,
-        contentType: 'text/csv',
-        entityType,
-      });
-      if (!res.ok) throw new Error(res.error);
-      return res.data;
-    },
-  });
-
-  // Start PDF upload mutation
-  const startPdfMutation = useMutation({
-    mutationFn: async () => {
-      if (!file) throw new Error('No file selected');
-      const res = await startPdfUpload({
-        fileName: file.name,
-        contentType: 'application/pdf',
-        entityType: 'contract',
-      });
-      if (!res.ok) throw new Error(res.error);
-      return res.data;
-    },
-  });
+  // Track uploading state
+  const [isUploading, setIsUploading] = useState(false);
 
   // Complete upload mutation
   const completeMutation = useMutation({
     mutationFn: async () => {
-      if (!uploadId) throw new Error('No upload ID');
+      if (uploadIds.length === 0) throw new Error('No upload IDs');
       
-      if (uploadType === 'csv') {
-        const mapping = columnMappings.length > 0 ? {
-          entityType,
-          columns: columnMappings.map(m => ({
-            sourceColumn: m.sourceColumn,
-            targetField: m.targetField,
-          })),
-          skipHeaderRow: true,
-          delimiter: ',',
-        } : undefined;
+      const results = [];
+      
+      for (const uploadId of uploadIds) {
+        if (uploadType === 'csv') {
+          const mapping = columnMappings.length > 0 ? {
+            entityType,
+            columns: columnMappings.map(m => ({
+              sourceColumn: m.sourceColumn,
+              targetField: m.targetField,
+            })),
+            skipHeaderRow: true,
+            delimiter: ',',
+          } : undefined;
 
-        const res = await completeCsvUpload(uploadId, mapping);
-        if (!res.ok) throw new Error(res.error);
-        return res.data;
-      } else {
-        const res = await completePdfUpload(uploadId);
-        if (!res.ok) throw new Error(res.error);
-        return res.data;
+          const res = await completeCsvUpload(uploadId, mapping, true); // autoProcess = true
+          if (!res.ok) throw new Error(res.error);
+          results.push(res.data);
+        } else {
+          const res = await completePdfUpload(uploadId, true); // autoProcess = true
+          if (!res.ok) throw new Error(res.error);
+          results.push(res.data);
+        }
       }
+      
+      return results;
     },
     onSuccess: () => {
       onComplete();
@@ -106,53 +92,62 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
   const resetWizard = () => {
     setStep('select-type');
     setUploadType(null);
-    setFile(null);
+    setFiles([]);
     setEntityType('customer');
-    setUploadProgress(0);
-    setUploadId(null);
+    setUploadProgress({});
+    setUploadIds([]);
+    setCurrentUploadIndex(0);
     setError(null);
     setCsvHeaders([]);
     setColumnMappings([]);
+    setIsUploading(false);
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    const droppedFile = acceptedFiles[0];
-    if (!droppedFile) return;
+    if (acceptedFiles.length === 0) return;
 
-    setFile(droppedFile);
+    setFiles(acceptedFiles);
     setError(null);
+    
+    // Initialize progress for all files
+    const initialProgress: Record<string, number> = {};
+    acceptedFiles.forEach(f => { initialProgress[f.name] = 0; });
+    setUploadProgress(initialProgress);
 
-    // Parse CSV headers if CSV
-    if (uploadType === 'csv' && droppedFile.name.endsWith('.csv')) {
-      const text = await droppedFile.slice(0, 4096).text();
-      const firstLine = text.split('\n')[0];
-      const headers = firstLine.split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-      setCsvHeaders(headers);
-      
-      // Auto-map obvious columns
-      const autoMappings: ColumnMapping[] = [];
-      const targetFields = [
-        { patterns: ['id', 'external_id', 'customer_id'], field: 'external_id', required: true },
-        { patterns: ['name', 'company', 'company_name'], field: 'name', required: true },
-        { patterns: ['email', 'e-mail'], field: 'email', required: false },
-        { patterns: ['phone', 'telephone'], field: 'phone', required: false },
-        { patterns: ['address', 'billing_address'], field: 'billing_address', required: false },
-      ];
+    // Parse CSV headers from the first CSV file
+    if (uploadType === 'csv') {
+      const firstCsv = acceptedFiles.find(f => f.name.endsWith('.csv'));
+      if (firstCsv) {
+        const text = await firstCsv.slice(0, 4096).text();
+        const firstLine = text.split('\n')[0];
+        const headers = firstLine.split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        setCsvHeaders(headers);
+        
+        // Auto-map obvious columns
+        const autoMappings: ColumnMapping[] = [];
+        const targetFields = [
+          { patterns: ['id', 'external_id', 'customer_id'], field: 'external_id', required: true },
+          { patterns: ['name', 'company', 'company_name'], field: 'name', required: true },
+          { patterns: ['email', 'e-mail'], field: 'email', required: false },
+          { patterns: ['phone', 'telephone'], field: 'phone', required: false },
+          { patterns: ['address', 'billing_address'], field: 'billing_address', required: false },
+        ];
 
-      for (const header of headers) {
-        const lower = header.toLowerCase();
-        for (const target of targetFields) {
-          if (target.patterns.some(p => lower.includes(p))) {
-            autoMappings.push({
-              sourceColumn: header,
-              targetField: target.field,
-              required: target.required,
-            });
-            break;
+        for (const header of headers) {
+          const lower = header.toLowerCase();
+          for (const target of targetFields) {
+            if (target.patterns.some(p => lower.includes(p))) {
+              autoMappings.push({
+                sourceColumn: header,
+                targetField: target.field,
+                required: target.required,
+              });
+              break;
+            }
           }
         }
+        setColumnMappings(autoMappings);
       }
-      setColumnMappings(autoMappings);
     }
   }, [uploadType]);
 
@@ -161,53 +156,101 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
     accept: uploadType === 'csv' 
       ? { 'text/csv': ['.csv'] }
       : { 'application/pdf': ['.pdf'] },
-    maxFiles: 1,
+    multiple: true,
+    maxSize: MAX_FILE_SIZE,
+    maxFiles: MAX_FILES,
+    onDropRejected: (rejections) => {
+      const errors: string[] = [];
+      for (const rejection of rejections) {
+        for (const error of rejection.errors) {
+          if (error.code === 'file-too-large') {
+            errors.push(`${rejection.file.name}: File exceeds 50MB limit`);
+          } else if (error.code === 'too-many-files') {
+            errors.push(`Maximum ${MAX_FILES} files allowed at once`);
+          } else if (error.code === 'file-invalid-type') {
+            errors.push(`${rejection.file.name}: Invalid file type`);
+          } else {
+            errors.push(`${rejection.file.name}: ${error.message}`);
+          }
+        }
+      }
+      setError([...new Set(errors)].join('. '));
+    },
   });
 
   const handleUploadFile = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
     setError(null);
+    setIsUploading(true);
+
+    const newUploadIds: string[] = [];
+    const successfulUploadIds: string[] = [];
 
     try {
-      // Start upload to get presigned URL
-      let presignedUrl: string;
-      let newUploadId: string;
+      // Upload each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setCurrentUploadIndex(i);
 
-      if (uploadType === 'csv') {
-        const data = await startCsvMutation.mutateAsync();
-        presignedUrl = data.presignedUrl;
-        newUploadId = data.uploadId;
-      } else {
-        const data = await startPdfMutation.mutateAsync();
-        presignedUrl = data.presignedUrl;
-        newUploadId = data.uploadId;
+        // Start upload to get presigned URL
+        let presignedUrl: string;
+        let newUploadId: string;
+
+        if (uploadType === 'csv') {
+          const res = await startCsvUpload({
+            fileName: file.name,
+            contentType: 'text/csv',
+            fileSize: file.size,
+            entityType,
+          });
+          if (!res.ok) throw new Error(res.error);
+          presignedUrl = res.data.presignedUrl;
+          newUploadId = res.data.uploadId;
+        } else {
+          const res = await startPdfUpload({
+            fileName: file.name,
+            contentType: 'application/pdf',
+            fileSize: file.size,
+            entityType: 'contract',
+          });
+          if (!res.ok) throw new Error(res.error);
+          presignedUrl = res.data.presignedUrl;
+          newUploadId = res.data.uploadId;
+        }
+
+        newUploadIds.push(newUploadId);
+
+        // Upload file to S3
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            setUploadProgress(prev => ({
+              ...prev,
+              [file.name]: Math.round((e.loaded / e.total) * 100),
+            }));
+          }
+        });
+
+        await new Promise<void>((resolve, reject) => {
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`Upload failed for ${file.name}: ${xhr.statusText || 'Storage error'}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error(`Upload failed for ${file.name}: Network error`));
+          xhr.open('PUT', presignedUrl);
+          xhr.setRequestHeader('Content-Type', file.type);
+          xhr.send(file);
+        });
+
+        // Mark this upload as successfully uploaded to S3
+        successfulUploadIds.push(newUploadId);
+        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
       }
 
-      setUploadId(newUploadId);
-
-      // Upload file to S3
-      const xhr = new XMLHttpRequest();
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          setUploadProgress(Math.round((e.loaded / e.total) * 100));
-        }
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error('Upload failed'));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Upload failed'));
-        xhr.open('PUT', presignedUrl);
-        xhr.setRequestHeader('Content-Type', file.type);
-        xhr.send(file);
-      });
-
-      setUploadProgress(100);
+      setUploadIds(successfulUploadIds);
       
       // For CSV, go to mapping step; for PDF, go directly to review
       if (uploadType === 'csv') {
@@ -216,7 +259,22 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
         setStep('review');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+      setError(errorMessage);
+      
+      // Clean up any database records for failed uploads
+      // Only delete uploads that were created but not successfully uploaded to S3
+      const failedUploadIds = newUploadIds.filter(id => !successfulUploadIds.includes(id));
+      for (const uploadId of failedUploadIds) {
+        try {
+          await deleteUpload(uploadId);
+        } catch {
+          // Ignore cleanup errors - the record will be orphaned but that's better than crashing
+          console.warn(`Failed to clean up upload ${uploadId}`);
+        }
+      }
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -229,7 +287,7 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
       case 'select-type':
         return uploadType !== null;
       case 'upload-file':
-        return file !== null && uploadProgress === 0;
+        return files.length > 0 && Object.values(uploadProgress).every(p => p === 0);
       case 'configure-mapping':
         return true; // Optional
       case 'review':
@@ -238,6 +296,10 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
         return false;
     }
   };
+  
+  const totalProgress = files.length > 0 
+    ? Math.round(Object.values(uploadProgress).reduce((a, b) => a + b, 0) / files.length)
+    : 0;
 
   if (!isOpen) return null;
 
@@ -383,40 +445,73 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
                   className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
                     isDragActive
                       ? 'border-accent bg-accent/10'
-                      : file
+                      : files.length > 0
                       ? 'border-green-500/50 bg-green-500/5'
                       : 'border-zinc-700 hover:border-zinc-600'
                   }`}
                 >
                   <input {...getInputProps()} />
-                  {file ? (
+                  {files.length > 0 ? (
                     <>
                       {uploadType === 'csv' ? (
                         <FileSpreadsheet size={48} className="mx-auto mb-3 text-green-400" />
                       ) : (
                         <FileText size={48} className="mx-auto mb-3 text-red-400" />
                       )}
-                      <p className="text-white font-medium">{file.name}</p>
-                      <p className="text-zinc-500 text-sm">{(file.size / 1024).toFixed(1)} KB</p>
+                      <p className="text-white font-medium">
+                        {files.length === 1 ? files[0].name : `${files.length} files selected`}
+                      </p>
+                      <p className="text-zinc-500 text-sm">
+                        {(files.reduce((sum, f) => sum + f.size, 0) / 1024).toFixed(1)} KB total
+                      </p>
                     </>
                   ) : (
                     <>
                       <Upload size={48} className="mx-auto mb-3 text-zinc-500" />
-                      <p className="text-white">Drop your {uploadType?.toUpperCase()} file here</p>
+                      <p className="text-white">Drop your {uploadType?.toUpperCase()} files here</p>
                       <p className="text-zinc-500 text-sm mt-1">or click to browse</p>
+                      <p className="text-zinc-600 text-xs mt-2">Max {MAX_FILES} files, 50MB each</p>
                     </>
                   )}
                 </div>
 
-                {uploadProgress > 0 && uploadProgress < 100 && (
+                {/* File list when multiple files selected */}
+                {files.length > 1 && (
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {files.map((file, idx) => (
+                      <div key={file.name} className="flex items-center justify-between px-3 py-2 bg-zinc-800/50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          {uploadType === 'csv' ? (
+                            <FileSpreadsheet size={16} className="text-green-400" />
+                          ) : (
+                            <FileText size={16} className="text-red-400" />
+                          )}
+                          <span className="text-sm text-white truncate max-w-[200px]">{file.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-zinc-500">{(file.size / 1024).toFixed(1)} KB</span>
+                          {uploadProgress[file.name] > 0 && (
+                            <span className={`text-xs ${uploadProgress[file.name] === 100 ? 'text-green-400' : 'text-accent'}`}>
+                              {uploadProgress[file.name]}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {isUploading && (
                   <div className="space-y-2">
                     <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-accent transition-all"
-                        style={{ width: `${uploadProgress}%` }}
+                        style={{ width: `${totalProgress}%` }}
                       />
                     </div>
-                    <p className="text-center text-sm text-zinc-400">Uploading... {uploadProgress}%</p>
+                    <p className="text-center text-sm text-zinc-400">
+                      Uploading file {currentUploadIndex + 1} of {files.length}... {totalProgress}%
+                    </p>
                   </div>
                 )}
               </motion.div>
@@ -488,12 +583,12 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
                     <span className="text-white uppercase">{uploadType}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">File Name</span>
-                    <span className="text-white">{file?.name}</span>
+                    <span className="text-zinc-500">Files</span>
+                    <span className="text-white">{files.length} file{files.length !== 1 ? 's' : ''}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">File Size</span>
-                    <span className="text-white">{file ? (file.size / 1024).toFixed(1) : 0} KB</span>
+                    <span className="text-zinc-500">Total Size</span>
+                    <span className="text-white">{(files.reduce((sum, f) => sum + f.size, 0) / 1024).toFixed(1)} KB</span>
                   </div>
                   {uploadType === 'csv' && (
                     <>
@@ -508,6 +603,18 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
                     </>
                   )}
                 </div>
+
+                {/* File list */}
+                {files.length > 0 && (
+                  <div className="space-y-2 max-h-24 overflow-y-auto">
+                    {files.map((file) => (
+                      <div key={file.name} className="flex items-center justify-between px-3 py-1.5 bg-zinc-800/30 rounded">
+                        <span className="text-sm text-zinc-300 truncate max-w-[250px]">{file.name}</span>
+                        <span className="text-xs text-zinc-500">{(file.size / 1024).toFixed(1)} KB</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <p className="text-zinc-500 text-sm">
                   Click "Complete Upload" to start processing your data.
@@ -525,8 +632,8 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
                 onClose();
               } else if (step === 'upload-file') {
                 setStep('select-type');
-                setFile(null);
-                setUploadProgress(0);
+                setFiles([]);
+                setUploadProgress({});
               } else if (step === 'configure-mapping') {
                 setStep('upload-file');
               } else if (step === 'review') {
@@ -539,18 +646,18 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
             Back
           </button>
 
-          {step === 'upload-file' && file && uploadProgress === 0 && (
+          {step === 'upload-file' && files.length > 0 && !isUploading && totalProgress === 0 && (
             <button
               onClick={handleUploadFile}
-              disabled={startCsvMutation.isPending || startPdfMutation.isPending}
+              disabled={isUploading}
               className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg transition-colors disabled:opacity-50"
             >
-              {startCsvMutation.isPending || startPdfMutation.isPending ? (
+              {isUploading ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
                 <Upload size={16} />
               )}
-              Upload
+              Upload {files.length > 1 ? `${files.length} Files` : 'File'}
             </button>
           )}
 

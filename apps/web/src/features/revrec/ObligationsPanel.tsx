@@ -38,8 +38,9 @@ export function ObligationsPanel({ snapshotId }: ObligationsPanelProps) {
   async function loadObligations() {
     setLoading(true);
     try {
-      const data = await listRevRecObligations({ snapshotId, limit: 50 });
-      setObligations(data.obligations);
+      const res = await listRevRecObligations({ snapshotId, limit: 50 });
+      if (!res.ok) throw new Error(res.error);
+      setObligations(res.data.obligations || []);
     } catch (err) {
       console.error('Failed to load obligations:', err);
     } finally {
@@ -50,8 +51,9 @@ export function ObligationsPanel({ snapshotId }: ObligationsPanelProps) {
   async function handleSelectObligation(id: string) {
     setDetailLoading(true);
     try {
-      const detail = await getRevRecObligation(id);
-      setSelectedObligation(detail);
+      const res = await getRevRecObligation(id);
+      if (!res.ok) throw new Error(res.error);
+      setSelectedObligation(res.data);
     } catch (err) {
       console.error('Failed to load obligation detail:', err);
     } finally {

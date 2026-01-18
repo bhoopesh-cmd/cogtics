@@ -11,6 +11,8 @@ import {
   CreateDetectionRunSchema,
   generateIssueStatusHistoryId,
   generateDetectionRunId,
+  GetEvidenceQuerySchema,
+  RegenerateEvidenceRequestSchema,
 } from '@cogtics/schemas';
 
 const issueRoutes: FastifyPluginAsync = async (fastify) => {
@@ -410,6 +412,55 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
     const tenantId = request.tenantId;
     const body = CreateDetectionRunSchema.parse(request.body);
     
+    // Validate snapshot exists and is completed
+    const snapshot = await db
+      .selectFrom('snapshots')
+      .select(['id', 'status'])
+      .where('id', '=', body.snapshotId)
+      .where('tenant_id', '=', tenantId)
+      .executeTakeFirst();
+
+    if (!snapshot) {
+      return reply.status(404).send({ error: 'Snapshot not found' });
+    }
+
+    if (snapshot.status !== 'completed') {
+      return reply.status(400).send({ 
+        error: 'Snapshot must be completed before running detection',
+        status: snapshot.status 
+      });
+    }
+
+    // Check if snapshot has any data to run detection on
+    const [contractsCount, invoicesCount, customersCount] = await Promise.all([
+      db.selectFrom('contracts')
+        .select(db.fn.count<number>('id').as('count'))
+        .where('snapshot_id', '=', body.snapshotId)
+        .where('tenant_id', '=', tenantId)
+        .executeTakeFirst(),
+      db.selectFrom('invoices')
+        .select(db.fn.count<number>('id').as('count'))
+        .where('snapshot_id', '=', body.snapshotId)
+        .where('tenant_id', '=', tenantId)
+        .executeTakeFirst(),
+      db.selectFrom('customers')
+        .select(db.fn.count<number>('id').as('count'))
+        .where('snapshot_id', '=', body.snapshotId)
+        .where('tenant_id', '=', tenantId)
+        .executeTakeFirst(),
+    ]);
+
+    const hasData = (contractsCount?.count ?? 0) > 0 || 
+                    (invoicesCount?.count ?? 0) > 0 || 
+                    (customersCount?.count ?? 0) > 0;
+
+    if (!hasData) {
+      return reply.status(400).send({ 
+        error: 'Snapshot has no data to run detection on. Please sync data first.',
+        snapshotId: body.snapshotId
+      });
+    }
+
     const queue = fastify.queues['detect.run'];
 
     // Create job record
@@ -470,6 +521,238 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
 
     return { success: true, jobId };
   });
+
+  // ============================================
+  // Phase 8: Evidence Endpoints
+  // ============================================
+
+  // GET /issues/:id/evidence - Get full evidence pack
+  fastify.get('/:id/evidence', async (request, reply) => {
+    const tenantId = request.tenantId;
+    const { id } = request.params as { id: string };
+    const query = GetEvidenceQuerySchema.parse(request.query);
+
+    // Verify issue exists
+    const issue = await db
+      .selectFrom('issues')
+      .select(['id', 'snapshot_id'])
+      .where('id', '=', id)
+      .where('tenant_id', '=', tenantId)
+      .executeTakeFirst();
+
+    if (!issue) {
+      return reply.status(404).send({ error: 'Issue not found' });
+    }
+
+    // Get latest evidence
+    const evidence = await db
+      .selectFrom('issue_evidence')
+      .selectAll()
+      .where('issue_id', '=', id)
+      .orderBy('evidence_version', 'desc')
+      .executeTakeFirst();
+
+    if (!evidence) {
+      return reply.status(404).send({ error: 'Evidence not found for this issue' });
+    }
+
+    // Get sources if requested
+    let sources: any[] = [];
+    if (query.includeSources) {
+      sources = await db
+        .selectFrom('issue_evidence_sources')
+        .selectAll()
+        .where('evidence_id', '=', evidence.id)
+        .execute();
+    }
+
+    // Get calculations if requested
+    let calculations: any[] = [];
+    if (query.includeCalculations) {
+      calculations = await db
+        .selectFrom('issue_evidence_calculations')
+        .selectAll()
+        .where('evidence_id', '=', evidence.id)
+        .orderBy('sequence_number', 'asc')
+        .execute();
+    }
+
+    // Get clauses if requested
+    let clauses: any[] = [];
+    if (query.includeClauses) {
+      clauses = await db
+        .selectFrom('issue_evidence_clauses')
+        .selectAll()
+        .where('evidence_id', '=', evidence.id)
+        .execute();
+    }
+
+    // Get audit if requested
+    let audit: any[] = [];
+    if (query.includeAudit) {
+      audit = await db
+        .selectFrom('issue_evidence_audit')
+        .selectAll()
+        .where('issue_id', '=', id)
+        .orderBy('created_at', 'desc')
+        .limit(10)
+        .execute();
+    }
+
+    // Generate download URL if S3 key exists
+    let downloadUrl = null;
+    if (evidence.s3_key && fastify.storage) {
+      try {
+        downloadUrl = await fastify.storage.getPresignedGetUrl(evidence.s3_key, 3600);
+      } catch (e) {
+        // Log but don't fail if S3 is unavailable
+      }
+    }
+
+    return {
+      evidence: mapEvidenceFromDb(evidence),
+      sources: sources.map(mapEvidenceSourceFromDb),
+      calculations: calculations.map(mapEvidenceCalculationFromDb),
+      clauses: clauses.map(mapEvidenceClauseFromDb),
+      audit: audit.map(mapEvidenceAuditFromDb),
+      downloadUrl,
+    };
+  });
+
+  // GET /issues/:id/evidence/summary - Get evidence summary only
+  fastify.get('/:id/evidence/summary', async (request, reply) => {
+    const tenantId = request.tenantId;
+    const { id } = request.params as { id: string };
+
+    // Get latest evidence
+    const evidence = await db
+      .selectFrom('issue_evidence')
+      .selectAll()
+      .where('issue_id', '=', id)
+      .orderBy('evidence_version', 'desc')
+      .executeTakeFirst();
+
+    if (!evidence) {
+      return reply.status(404).send({ error: 'Evidence not found for this issue' });
+    }
+
+    // Get counts
+    const sourcesCount = await db
+      .selectFrom('issue_evidence_sources')
+      .select(db.fn.countAll().as('count'))
+      .where('evidence_id', '=', evidence.id)
+      .executeTakeFirst();
+
+    const calculationsCount = await db
+      .selectFrom('issue_evidence_calculations')
+      .select(db.fn.countAll().as('count'))
+      .where('evidence_id', '=', evidence.id)
+      .executeTakeFirst();
+
+    const clausesCount = await db
+      .selectFrom('issue_evidence_clauses')
+      .select(db.fn.countAll().as('count'))
+      .where('evidence_id', '=', evidence.id)
+      .executeTakeFirst();
+
+    return {
+      issueId: id,
+      evidenceVersion: evidence.evidence_version,
+      title: evidence.title,
+      summary: evidence.summary,
+      completenessScore: Number(evidence.completeness_score),
+      completenessBreakdown: evidence.completeness_breakdown as Record<string, number>,
+      hasS3Artifact: !!evidence.s3_key,
+      sourcesCount: Number(sourcesCount?.count || 0),
+      calculationsCount: Number(calculationsCount?.count || 0),
+      clausesCount: Number(clausesCount?.count || 0),
+      generatedAt: evidence.created_at,
+    };
+  });
+
+  // GET /issues/:id/evidence/download - Get pre-signed download URL
+  fastify.get('/:id/evidence/download', async (request, reply) => {
+    const tenantId = request.tenantId;
+    const { id } = request.params as { id: string };
+
+    // Get latest evidence with S3 key
+    const evidence = await db
+      .selectFrom('issue_evidence')
+      .select(['s3_key'])
+      .where('issue_id', '=', id)
+      .orderBy('evidence_version', 'desc')
+      .executeTakeFirst();
+
+    if (!evidence) {
+      return reply.status(404).send({ error: 'Evidence not found for this issue' });
+    }
+
+    if (!evidence.s3_key) {
+      return reply.status(404).send({ error: 'No downloadable artifact for this evidence' });
+    }
+
+    if (!fastify.storage) {
+      return reply.status(503).send({ error: 'Storage service unavailable' });
+    }
+
+    try {
+      const downloadUrl = await fastify.storage.getPresignedGetUrl(evidence.s3_key, 3600);
+      return { downloadUrl, expiresIn: 3600 };
+    } catch (e) {
+      return reply.status(500).send({ error: 'Failed to generate download URL' });
+    }
+  });
+
+  // POST /issues/:id/evidence/regenerate - Regenerate evidence (Admin only)
+  fastify.post('/:id/evidence/regenerate', async (request, reply) => {
+    const tenantId = request.tenantId;
+    const userId = request.userId;
+    const { id } = request.params as { id: string };
+    const body = RegenerateEvidenceRequestSchema.parse(request.body || {});
+
+    // Verify issue exists
+    const issue = await db
+      .selectFrom('issues')
+      .select(['id', 'snapshot_id'])
+      .where('id', '=', id)
+      .where('tenant_id', '=', tenantId)
+      .executeTakeFirst();
+
+    if (!issue) {
+      return reply.status(404).send({ error: 'Issue not found' });
+    }
+
+    const queue = fastify.queues['evidence.regenerate'];
+    if (!queue) {
+      return reply.status(503).send({ error: 'Evidence queue not available' });
+    }
+
+    // Create job record
+    const jobId = `job_${Date.now()}`;
+    await db.insertInto('jobs').values({
+      id: jobId,
+      tenant_id: tenantId,
+      type: 'evidence',
+      status: 'pending',
+      payload_json: { issueId: id, force: body.force, reason: body.reason },
+    }).execute();
+
+    // Queue the job
+    await queue.add('evidence.regenerate', {
+      jobId,
+      tenantId,
+      payload: {
+        type: 'evidence.regenerate',
+        tenantId,
+        issueId: id,
+        force: body.force,
+        actorUserId: userId,
+        reason: body.reason,
+      },
+    });
+
+    return { success: true, jobId };
+  });
 };
 
 // Helper to map DB issue to API response
@@ -499,6 +782,113 @@ function mapIssueFromDb(issue: any) {
     ruleMetadata: issue.rule_metadata_json,
     createdAt: issue.created_at,
     updatedAt: issue.updated_at,
+  };
+}
+
+// Helper to map DB evidence to API response
+function mapEvidenceFromDb(evidence: any) {
+  return {
+    id: evidence.id,
+    tenantId: evidence.tenant_id,
+    snapshotId: evidence.snapshot_id,
+    issueId: evidence.issue_id,
+    evidenceVersion: evidence.evidence_version,
+    evidenceType: evidence.evidence_type,
+    title: evidence.title,
+    summary: evidence.summary,
+    dataJson: evidence.data_json,
+    completenessScore: Number(evidence.completeness_score),
+    completenessBreakdown: evidence.completeness_breakdown,
+    s3Key: evidence.s3_key,
+    ruleId: evidence.rule_id,
+    ruleVersion: evidence.rule_version,
+    createdAt: evidence.created_at,
+  };
+}
+
+// Helper to map evidence source from DB
+function mapEvidenceSourceFromDb(source: any) {
+  return {
+    id: source.id,
+    tenantId: source.tenant_id,
+    evidenceId: source.evidence_id,
+    issueId: source.issue_id,
+    sourceType: source.source_type,
+    sourceId: source.source_id,
+    sourceSystem: source.source_system,
+    sourceExternalId: source.source_external_id,
+    fieldName: source.field_name,
+    fieldValueJson: source.field_value_json,
+    s3Key: source.s3_key,
+    snapshotValueJson: source.snapshot_value_json,
+    createdAt: source.created_at,
+  };
+}
+
+// Helper to map evidence calculation from DB
+function mapEvidenceCalculationFromDb(calc: any) {
+  return {
+    id: calc.id,
+    tenantId: calc.tenant_id,
+    evidenceId: calc.evidence_id,
+    issueId: calc.issue_id,
+    calcName: calc.calc_name,
+    calcType: calc.calc_type,
+    formula: calc.formula,
+    inputsJson: calc.inputs_json,
+    outputsJson: calc.outputs_json,
+    ruleId: calc.rule_id,
+    ruleVersion: calc.rule_version,
+    sequenceNumber: calc.sequence_number,
+    isReproducible: calc.is_reproducible,
+    notes: calc.notes,
+    createdAt: calc.created_at,
+  };
+}
+
+// Helper to map evidence clause from DB
+function mapEvidenceClauseFromDb(clause: any) {
+  return {
+    id: clause.id,
+    tenantId: clause.tenant_id,
+    evidenceId: clause.evidence_id,
+    issueId: clause.issue_id,
+    clauseId: clause.clause_id,
+    contractId: clause.contract_id,
+    contractVersionId: clause.contract_version_id,
+    documentId: clause.document_id,
+    clauseType: clause.clause_type,
+    clauseLabel: clause.clause_label,
+    excerpt: clause.excerpt,
+    fullTextS3Key: clause.full_text_s3_key,
+    startOffset: clause.start_offset,
+    endOffset: clause.end_offset,
+    pageNumber: clause.page_number,
+    relevanceScore: clause.relevance_score ? Number(clause.relevance_score) : null,
+    createdAt: clause.created_at,
+  };
+}
+
+// Helper to map evidence audit from DB
+function mapEvidenceAuditFromDb(audit: any) {
+  return {
+    id: audit.id,
+    tenantId: audit.tenant_id,
+    issueId: audit.issue_id,
+    evidenceId: audit.evidence_id,
+    evidenceVersion: audit.evidence_version,
+    action: audit.action,
+    status: audit.status,
+    triggerType: audit.trigger_type,
+    actorUserId: audit.actor_user_id,
+    previousVersion: audit.previous_version,
+    completenessScore: audit.completeness_score ? Number(audit.completeness_score) : null,
+    processingTimeMs: audit.processing_time_ms,
+    errorCode: audit.error_code,
+    errorMessage: audit.error_message,
+    metadataJson: audit.metadata_json,
+    generatedAt: audit.generated_at,
+    createdAt: audit.created_at,
   };
 }
 

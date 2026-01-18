@@ -17,7 +17,11 @@ export function DataExplorerPage() {
   // Fetch snapshots
   const { data: snapshotsData, isLoading: snapshotsLoading } = useQuery({
     queryKey: ['snapshots', { status: 'complete', limit: 10 }],
-    queryFn: () => listSnapshots({ status: 'complete', limit: 10 }),
+    queryFn: async () => {
+      const res = await listSnapshots({ status: 'complete', limit: 10 });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
   });
 
   const snapshots = snapshotsData?.snapshots ?? [];
@@ -28,31 +32,51 @@ export function DataExplorerPage() {
   // Fetch data based on active tab
   const { data: customersData, isLoading: customersLoading, refetch: refetchCustomers } = useQuery({
     queryKey: ['customers', { snapshotId: currentSnapshot?.id, search: searchQuery }],
-    queryFn: () => listCustomers({ snapshotId: currentSnapshot?.id, limit: 50, search: searchQuery || undefined }),
+    queryFn: async () => {
+      const res = await listCustomers({ snapshotId: currentSnapshot?.id, limit: 50, search: searchQuery || undefined });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     enabled: activeTab === 'customers' && !!currentSnapshot?.id,
   });
 
   const { data: contractsData, isLoading: contractsLoading, refetch: refetchContracts } = useQuery({
     queryKey: ['contracts', { snapshotId: currentSnapshot?.id, search: searchQuery }],
-    queryFn: () => listContracts({ snapshotId: currentSnapshot?.id, limit: 50, search: searchQuery || undefined }),
+    queryFn: async () => {
+      const res = await listContracts({ snapshotId: currentSnapshot?.id, limit: 50, search: searchQuery || undefined });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     enabled: activeTab === 'contracts' && !!currentSnapshot?.id,
   });
 
   const { data: invoicesData, isLoading: invoicesLoading, refetch: refetchInvoices } = useQuery({
     queryKey: ['invoices', { snapshotId: currentSnapshot?.id, search: searchQuery }],
-    queryFn: () => listInvoices({ snapshotId: currentSnapshot?.id, limit: 50, search: searchQuery || undefined }),
+    queryFn: async () => {
+      const res = await listInvoices({ snapshotId: currentSnapshot?.id, limit: 50, search: searchQuery || undefined });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     enabled: activeTab === 'invoices' && !!currentSnapshot?.id,
   });
 
   const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useQuery({
     queryKey: ['products', { snapshotId: currentSnapshot?.id, search: searchQuery }],
-    queryFn: () => listProducts({ snapshotId: currentSnapshot?.id, limit: 50, search: searchQuery || undefined }),
+    queryFn: async () => {
+      const res = await listProducts({ snapshotId: currentSnapshot?.id, limit: 50, search: searchQuery || undefined });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     enabled: activeTab === 'products' && !!currentSnapshot?.id,
   });
 
   const { data: paymentsData, isLoading: paymentsLoading, refetch: refetchPayments } = useQuery({
     queryKey: ['payments', { snapshotId: currentSnapshot?.id }],
-    queryFn: () => listPayments({ snapshotId: currentSnapshot?.id, limit: 50 }),
+    queryFn: async () => {
+      const res = await listPayments({ snapshotId: currentSnapshot?.id, limit: 50 });
+      if (!res.ok) throw new Error(res.error);
+      return res.data;
+    },
     enabled: activeTab === 'payments' && !!currentSnapshot?.id,
   });
 

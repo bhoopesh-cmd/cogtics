@@ -20,9 +20,12 @@ class ApiClient {
       token?: string | null;
     } = {}
   ): Promise<ApiResponse<T>> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+    const headers: Record<string, string> = {};
+
+    // Only set Content-Type if we have a body
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (options.token) {
       headers['Authorization'] = `Bearer ${options.token}`;
@@ -32,7 +35,7 @@ class ApiClient {
       const response = await fetch(`${this.baseUrl}${path}`, {
         method,
         headers,
-        body: options.body ? JSON.stringify(options.body) : undefined,
+        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       });
 
       let data: T;

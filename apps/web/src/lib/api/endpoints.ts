@@ -914,6 +914,7 @@ export interface UploadDetail extends Upload {
 export async function startCsvUpload(params: {
   fileName: string;
   contentType: string;
+  fileSize?: number;
   entityType?: string;
   displayName?: string;
 }) {
@@ -928,6 +929,7 @@ export async function startCsvUpload(params: {
       type: 'csv',
       fileName: params.fileName,
       contentType: params.contentType,
+      fileSize: params.fileSize,
       entityType: params.entityType,
       displayName: params.displayName,
     },
@@ -935,14 +937,14 @@ export async function startCsvUpload(params: {
   );
 }
 
-export async function completeCsvUpload(uploadId: string, mapping?: Record<string, unknown>) {
+export async function completeCsvUpload(uploadId: string, mapping?: Record<string, unknown>, autoProcess = false) {
   return apiClient.post<{
     uploadId: string;
     parseRunId: string;
     status: string;
   }>(
     '/uploads/csv/complete',
-    { uploadId, mapping, autoProcess: true },
+    { uploadId, mapping, autoProcess },
     getToken()
   );
 }
@@ -950,6 +952,7 @@ export async function completeCsvUpload(uploadId: string, mapping?: Record<strin
 export async function startPdfUpload(params: {
   fileName: string;
   contentType: string;
+  fileSize?: number;
   entityType?: string;
   displayName?: string;
 }) {
@@ -964,6 +967,7 @@ export async function startPdfUpload(params: {
       type: 'pdf',
       fileName: params.fileName,
       contentType: params.contentType,
+      fileSize: params.fileSize,
       entityType: params.entityType ?? 'contract',
       displayName: params.displayName,
     },
@@ -971,14 +975,14 @@ export async function startPdfUpload(params: {
   );
 }
 
-export async function completePdfUpload(uploadId: string) {
+export async function completePdfUpload(uploadId: string, autoProcess = false) {
   return apiClient.post<{
     uploadId: string;
     parseRunId: string;
     status: string;
   }>(
     '/uploads/pdf/complete',
-    { uploadId, autoProcess: true },
+    { uploadId, autoProcess },
     getToken()
   );
 }
@@ -1632,6 +1636,682 @@ export async function replayDetectionRun(runId: string, rulesetVersion?: string)
   return apiClient.post<{ success: boolean; jobId: string }>(
     `/issues/detection-runs/${runId}/replay`,
     { rulesetVersion },
+    getToken()
+  );
+}
+
+// ============================================
+// Phase 8: Evidence Generation
+// ============================================
+
+export interface IssueEvidence {
+  id: string;
+  tenantId: string;
+  snapshotId: string;
+  issueId: string;
+  evidenceVersion: number;
+  evidenceType: 'full' | 'summary' | 'calculation' | 'clause' | 'source';
+  title: string;
+  summary: string;
+  dataJson: Record<string, unknown>;
+  completenessScore: number;
+  completenessBreakdown: Record<string, number>;
+  s3Key: string | null;
+  ruleId: string | null;
+  ruleVersion: string | null;
+  createdAt: string;
+}
+
+export interface IssueEvidenceSource {
+  id: string;
+  tenantId: string;
+  evidenceId: string;
+  issueId: string;
+  sourceType: string;
+  sourceId: string;
+  sourceSystem: string | null;
+  sourceExternalId: string | null;
+  fieldName: string | null;
+  fieldValueJson: unknown;
+  s3Key: string | null;
+  snapshotValueJson: unknown;
+  createdAt: string;
+}
+
+export interface IssueEvidenceCalculation {
+  id: string;
+  tenantId: string;
+  evidenceId: string;
+  issueId: string;
+  calcName: string;
+  calcType: string;
+  formula: string | null;
+  inputsJson: Record<string, unknown>;
+  outputsJson: Record<string, unknown>;
+  ruleId: string | null;
+  ruleVersion: string | null;
+  sequenceNumber: number;
+  isReproducible: boolean;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface IssueEvidenceClause {
+  id: string;
+  tenantId: string;
+  evidenceId: string;
+  issueId: string;
+  clauseId: string | null;
+  contractId: string | null;
+  contractVersionId: string | null;
+  documentId: string | null;
+  clauseType: string | null;
+  clauseLabel: string | null;
+  excerpt: string;
+  fullTextS3Key: string | null;
+  startOffset: number | null;
+  endOffset: number | null;
+  pageNumber: number | null;
+  relevanceScore: number | null;
+  createdAt: string;
+}
+
+export interface IssueEvidenceAudit {
+  id: string;
+  tenantId: string;
+  issueId: string;
+  evidenceId: string | null;
+  evidenceVersion: number;
+  action: 'generated' | 'regenerated' | 'failed' | 'expired' | 'archived';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  triggerType: 'auto' | 'manual' | 'scheduled' | 'detection_run';
+  actorUserId: string | null;
+  previousVersion: number | null;
+  completenessScore: number | null;
+  processingTimeMs: number | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  metadataJson: Record<string, unknown> | null;
+  generatedAt: string;
+  createdAt: string;
+}
+
+export interface EvidenceResponse {
+  evidence: IssueEvidence;
+  sources: IssueEvidenceSource[];
+  calculations: IssueEvidenceCalculation[];
+  clauses: IssueEvidenceClause[];
+  audit: IssueEvidenceAudit[];
+  downloadUrl: string | null;
+}
+
+export interface EvidenceSummaryResponse {
+  issueId: string;
+  evidenceVersion: number;
+  title: string;
+  summary: string;
+  completenessScore: number;
+  completenessBreakdown: Record<string, number>;
+  hasS3Artifact: boolean;
+  sourcesCount: number;
+  calculationsCount: number;
+  clausesCount: number;
+  generatedAt: string;
+}
+
+export async function getIssueEvidence(issueId: string, options?: {
+  includeCalculations?: boolean;
+  includeClauses?: boolean;
+  includeSources?: boolean;
+  includeAudit?: boolean;
+}) {
+  const params = new URLSearchParams();
+  if (options?.includeCalculations !== undefined) params.set('includeCalculations', String(options.includeCalculations));
+  if (options?.includeClauses !== undefined) params.set('includeClauses', String(options.includeClauses));
+  if (options?.includeSources !== undefined) params.set('includeSources', String(options.includeSources));
+  if (options?.includeAudit !== undefined) params.set('includeAudit', String(options.includeAudit));
+  
+  const query = params.toString();
+  return apiClient.get<EvidenceResponse>(
+    `/issues/${issueId}/evidence${query ? `?${query}` : ''}`,
+    getToken()
+  );
+}
+
+export async function getIssueEvidenceSummary(issueId: string) {
+  return apiClient.get<EvidenceSummaryResponse>(
+    `/issues/${issueId}/evidence/summary`,
+    getToken()
+  );
+}
+
+export async function getIssueEvidenceDownloadUrl(issueId: string) {
+  return apiClient.get<{ downloadUrl: string; expiresIn: number }>(
+    `/issues/${issueId}/evidence/download`,
+    getToken()
+  );
+}
+
+export async function regenerateIssueEvidence(issueId: string, options?: {
+  force?: boolean;
+  reason?: string;
+}) {
+  return apiClient.post<{ success: boolean; jobId: string }>(
+    `/issues/${issueId}/evidence/regenerate`,
+    options || {},
+    getToken()
+  );
+}
+
+// ============================================
+// Simulations (Phase 9)
+// ============================================
+
+export interface Simulation {
+  id: string;
+  snapshotId: string;
+  name: string;
+  description: string | null;
+  status: 'draft' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  templateId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  overridesCount?: number;
+  latestRun?: SimulationRun | null;
+}
+
+export interface SimulationOverride {
+  id: string;
+  overrideType: 'contract_term' | 'usage_adjustment' | 'billing_adjustment' | 'timing_shift' | 'discount_change' | 'price_change';
+  targetType: 'contract' | 'invoice' | 'customer' | 'obligation' | 'line_item';
+  targetId: string;
+  fieldPath: string | null;
+  originalValue: unknown;
+  overrideValue: unknown;
+  sequenceNumber: number;
+  isValid: boolean;
+  validationMessage: string | null;
+  createdAt: string;
+}
+
+export interface SimulationRun {
+  id: string;
+  runNumber: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  startedAt: string | null;
+  finishedAt: string | null;
+  processingTimeMs: number | null;
+  triggeredBy: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface SimulationResult {
+  id: string;
+  runId: string;
+  simulationId: string;
+  totalRevenueBaseline: number | null;
+  totalRevenueSimulated: number | null;
+  totalRevenueDelta: number | null;
+  totalRevenueDeltaPct: number | null;
+  totalRecognizedBaseline: number | null;
+  totalRecognizedSimulated: number | null;
+  totalDeferredBaseline: number | null;
+  totalDeferredSimulated: number | null;
+  contractsAffected: number;
+  obligationsAffected: number;
+  overridesApplied: number;
+  overridesSkipped: number;
+  summary: Record<string, unknown>;
+  warnings: unknown[];
+  createdAt: string;
+}
+
+export interface SimulationDelta {
+  id: string;
+  deltaType: 'revenue_total' | 'revenue_period' | 'recognized_shift' | 'deferred_shift' | 'contract_impact' | 'obligation_impact';
+  targetType: string | null;
+  targetId: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  baselineAmount: number | null;
+  simulatedAmount: number | null;
+  deltaAmount: number;
+  deltaPct: number | null;
+  currency: string;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface SimulationTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  overridesCount: number;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SimulationListQuery {
+  snapshotId?: string;
+  status?: string;
+  templateId?: string;
+  createdBy?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: 'created_at' | 'updated_at' | 'name' | 'status';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export async function listSimulations(query?: SimulationListQuery) {
+  const params = new URLSearchParams();
+  if (query?.snapshotId) params.set('snapshotId', query.snapshotId);
+  if (query?.status) params.set('status', query.status);
+  if (query?.templateId) params.set('templateId', query.templateId);
+  if (query?.createdBy) params.set('createdBy', query.createdBy);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+  if (query?.sortBy) params.set('sortBy', query.sortBy);
+  if (query?.sortOrder) params.set('sortOrder', query.sortOrder);
+  
+  const queryStr = params.toString();
+  return apiClient.get<{ simulations: Simulation[]; total: number; page: number; limit: number }>(
+    `/simulations${queryStr ? `?${queryStr}` : ''}`,
+    getToken()
+  );
+}
+
+export async function createSimulation(data: {
+  snapshotId: string;
+  name: string;
+  description?: string;
+  templateId?: string;
+}) {
+  return apiClient.post<{ id: string; message: string }>(
+    '/simulations',
+    data,
+    getToken()
+  );
+}
+
+export async function getSimulation(id: string) {
+  return apiClient.get<Simulation>(`/simulations/${id}`, getToken());
+}
+
+export async function updateSimulation(id: string, data: {
+  name?: string;
+  description?: string;
+  status?: 'draft' | 'cancelled';
+}) {
+  return apiClient.patch<{ message: string }>(`/simulations/${id}`, data, getToken());
+}
+
+export async function deleteSimulation(id: string) {
+  return apiClient.delete<{ message: string }>(`/simulations/${id}`, getToken());
+}
+
+export async function getSimulationOverrides(simulationId: string) {
+  return apiClient.get<{ overrides: SimulationOverride[] }>(
+    `/simulations/${simulationId}/overrides`,
+    getToken()
+  );
+}
+
+export async function addSimulationOverride(simulationId: string, override: {
+  overrideType: string;
+  targetType: string;
+  targetId: string;
+  fieldPath?: string;
+  overrideValue: unknown;
+  sequenceNumber?: number;
+}) {
+  return apiClient.post<{ id: string; message: string }>(
+    `/simulations/${simulationId}/overrides`,
+    override,
+    getToken()
+  );
+}
+
+export async function deleteSimulationOverride(simulationId: string, overrideId: string) {
+  return apiClient.delete<{ message: string }>(
+    `/simulations/${simulationId}/overrides/${overrideId}`,
+    getToken()
+  );
+}
+
+export async function runSimulation(id: string, options?: {
+  recomputeRevRec?: boolean;
+  includeIssueAnalysis?: boolean;
+}) {
+  return apiClient.post<{ runId: string; runNumber: number; message: string }>(
+    `/simulations/${id}/run`,
+    options || {},
+    getToken()
+  );
+}
+
+export async function getSimulationRuns(simulationId: string, query?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (query?.status) params.set('status', query.status);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+  
+  const queryStr = params.toString();
+  return apiClient.get<{ runs: SimulationRun[] }>(
+    `/simulations/${simulationId}/runs${queryStr ? `?${queryStr}` : ''}`,
+    getToken()
+  );
+}
+
+export async function getSimulationRunResults(simulationId: string, runId: string) {
+  return apiClient.get<SimulationResult>(
+    `/simulations/${simulationId}/runs/${runId}/results`,
+    getToken()
+  );
+}
+
+export async function getSimulationRunDeltas(simulationId: string, runId: string, query?: {
+  deltaType?: string;
+  targetType?: string;
+  targetId?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (query?.deltaType) params.set('deltaType', query.deltaType);
+  if (query?.targetType) params.set('targetType', query.targetType);
+  if (query?.targetId) params.set('targetId', query.targetId);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+  
+  const queryStr = params.toString();
+  return apiClient.get<{ deltas: SimulationDelta[] }>(
+    `/simulations/${simulationId}/runs/${runId}/deltas${queryStr ? `?${queryStr}` : ''}`,
+    getToken()
+  );
+}
+
+export async function listSimulationTemplates(query?: {
+  isActive?: boolean;
+  page?: number;
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (query?.isActive !== undefined) params.set('isActive', String(query.isActive));
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+  
+  const queryStr = params.toString();
+  return apiClient.get<{ templates: SimulationTemplate[] }>(
+    `/simulations/templates${queryStr ? `?${queryStr}` : ''}`,
+    getToken()
+  );
+}
+
+export async function createSimulationTemplate(data: {
+  name: string;
+  description?: string;
+  overrides: Array<{
+    overrideType: string;
+    targetType: string;
+    targetId: string;
+    fieldPath?: string;
+    overrideValue: unknown;
+  }>;
+  defaultOptions?: Record<string, unknown>;
+}) {
+  return apiClient.post<{ id: string; message: string }>(
+    '/simulations/templates',
+    data,
+    getToken()
+  );
+}
+
+export async function getSimulationTemplate(id: string) {
+  return apiClient.get<SimulationTemplate & { templateJson: unknown }>(
+    `/simulations/templates/${id}`,
+    getToken()
+  );
+}
+
+export async function applySimulationTemplate(templateId: string, data: {
+  snapshotId: string;
+  name: string;
+  description?: string;
+}) {
+  return apiClient.post<{ simulationId: string; message: string }>(
+    `/simulations/templates/${templateId}/apply`,
+    data,
+    getToken()
+  );
+}
+
+// ============================================
+// Exports (Phase 10)
+// ============================================
+
+export interface Export {
+  id: string;
+  tenantId: string;
+  snapshotId: string;
+  exportType: 'issues_csv' | 'revrec_csv' | 'contracts_csv' | 'contracts_pdf' | 'audit_bundle_pdf' | 'executive_summary_pdf';
+  format: 'csv' | 'pdf' | 'xlsx';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  requestedBy: string | null;
+  options: Record<string, unknown>;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface ExportFile {
+  id: string;
+  exportId: string;
+  s3Key: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  checksumSha256: string | null;
+  createdAt: string;
+}
+
+export async function createExport(data: {
+  snapshotId: string;
+  exportType: string;
+  options?: {
+    includeEvidence?: boolean;
+    dateRange?: { start: string; end: string };
+    filters?: Record<string, unknown>;
+  };
+}) {
+  return apiClient.post<{ export: Export; jobId: string }>(
+    '/exports',
+    data,
+    getToken()
+  );
+}
+
+export async function listExports(query?: {
+  snapshotId?: string;
+  exportType?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const params = new URLSearchParams();
+  if (query?.snapshotId) params.set('snapshotId', query.snapshotId);
+  if (query?.exportType) params.set('exportType', query.exportType);
+  if (query?.status) params.set('status', query.status);
+  if (query?.limit) params.set('limit', String(query.limit));
+  if (query?.offset) params.set('offset', String(query.offset));
+  
+  const queryStr = params.toString();
+  return apiClient.get<{ exports: Export[]; total: number; limit: number; offset: number }>(
+    `/exports${queryStr ? `?${queryStr}` : ''}`,
+    getToken()
+  );
+}
+
+export async function getExport(id: string) {
+  return apiClient.get<{ export: Export; files: ExportFile[] }>(
+    `/exports/${id}`,
+    getToken()
+  );
+}
+
+export async function getExportDownloadUrl(id: string, fileId?: string) {
+  const params = fileId ? `?fileId=${fileId}` : '';
+  return apiClient.get<{
+    downloadUrl: string;
+    expiresAt: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+  }>(
+    `/exports/${id}/download${params}`,
+    getToken()
+  );
+}
+
+export async function regenerateExport(id: string) {
+  return apiClient.post<{ success: boolean; jobId: string }>(
+    `/exports/${id}/regenerate`,
+    {},
+    getToken()
+  );
+}
+
+export async function deleteExport(id: string) {
+  return apiClient.delete<{ success: boolean; action: string }>(
+    `/exports/${id}`,
+    getToken()
+  );
+}
+
+// ============================================
+// Digests (Phase 10)
+// ============================================
+
+export interface DigestSubscription {
+  id: string;
+  tenantId: string;
+  name: string;
+  cadence: 'daily' | 'weekly' | 'monthly';
+  scope: Record<string, unknown>;
+  recipients: string[];
+  isActive: boolean;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DigestRun {
+  id: string;
+  tenantId: string;
+  subscriptionId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  itemsCount: number;
+  recipientsCount: number;
+  emailsSent: number;
+  emailsFailed: number;
+  snapshotId: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export async function createDigestSubscription(data: {
+  name: string;
+  cadence: 'daily' | 'weekly' | 'monthly';
+  scope?: Record<string, unknown>;
+  recipients: string[];
+}) {
+  return apiClient.post<{ subscription: DigestSubscription }>(
+    '/digests',
+    data,
+    getToken()
+  );
+}
+
+export async function listDigestSubscriptions(query?: {
+  isActive?: boolean;
+  cadence?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const params = new URLSearchParams();
+  if (query?.isActive !== undefined) params.set('isActive', String(query.isActive));
+  if (query?.cadence) params.set('cadence', query.cadence);
+  if (query?.limit) params.set('limit', String(query.limit));
+  if (query?.offset) params.set('offset', String(query.offset));
+  
+  const queryStr = params.toString();
+  return apiClient.get<{ subscriptions: DigestSubscription[]; total: number; limit: number; offset: number }>(
+    `/digests${queryStr ? `?${queryStr}` : ''}`,
+    getToken()
+  );
+}
+
+export async function getDigestSubscription(id: string) {
+  return apiClient.get<{ subscription: DigestSubscription }>(
+    `/digests/${id}`,
+    getToken()
+  );
+}
+
+export async function updateDigestSubscription(id: string, data: {
+  name?: string;
+  cadence?: 'daily' | 'weekly' | 'monthly';
+  scope?: Record<string, unknown>;
+  recipients?: string[];
+  isActive?: boolean;
+}) {
+  return apiClient.patch<{ subscription: DigestSubscription }>(
+    `/digests/${id}`,
+    data,
+    getToken()
+  );
+}
+
+export async function deleteDigestSubscription(id: string) {
+  return apiClient.delete<{ success: boolean }>(
+    `/digests/${id}`,
+    getToken()
+  );
+}
+
+export async function getDigestRuns(subscriptionId: string, query?: {
+  limit?: number;
+  offset?: number;
+}) {
+  const params = new URLSearchParams();
+  if (query?.limit) params.set('limit', String(query.limit));
+  if (query?.offset) params.set('offset', String(query.offset));
+  
+  const queryStr = params.toString();
+  return apiClient.get<{ runs: DigestRun[]; total: number; limit: number; offset: number }>(
+    `/digests/${subscriptionId}/runs${queryStr ? `?${queryStr}` : ''}`,
+    getToken()
+  );
+}
+
+export async function triggerDigest(subscriptionId: string) {
+  return apiClient.post<{ runId: string; jobId: string; status: string }>(
+    `/digests/${subscriptionId}/trigger`,
+    {},
     getToken()
   );
 }

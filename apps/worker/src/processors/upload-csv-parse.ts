@@ -23,7 +23,7 @@ interface JobResult {
 }
 
 interface StorageClient {
-  getObject(key: string): Promise<{ Body: NodeJS.ReadableStream | null }>;
+  get(key: string): Promise<Buffer>;
 }
 
 /**
@@ -67,17 +67,11 @@ export async function processCsvParseJob(
     }
 
     // Download file from S3
-    const s3Object = await storage.getObject(file.s3_key);
-    if (!s3Object.Body) {
-      throw new Error('Empty file body from S3');
+    const fileBuffer = await storage.get(file.s3_key);
+    if (!fileBuffer || fileBuffer.length === 0) {
+      throw new Error('Empty file from S3');
     }
-
-    // Read stream to string
-    const chunks: Buffer[] = [];
-    for await (const chunk of s3Object.Body as AsyncIterable<Buffer>) {
-      chunks.push(chunk);
-    }
-    const csvContent = Buffer.concat(chunks).toString('utf-8');
+    const csvContent = fileBuffer.toString('utf-8');
 
     // Parse CSV
     const parseConfig = mapping as UploadMappingData | undefined;

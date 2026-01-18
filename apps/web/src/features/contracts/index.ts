@@ -6,3 +6,4 @@ export { ClausesPanel } from './ClausesPanel';
 export { TermsPanel } from './TermsPanel';
 export { ReadinessPanel } from './ReadinessPanel';
 export { TermOverrideModal } from './TermOverrideModal';
+export { default as ReviewQueuePage } from './ReviewQueuePage';

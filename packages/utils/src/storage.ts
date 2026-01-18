@@ -208,6 +208,50 @@ export class StorageClient {
 
     return getSignedUrl(this.client, command, { expiresIn: expiresInSeconds });
   }
+
+  /**
+   * Generate a pre-signed URL for uploading an object (raw key, no tenant prefix)
+   */
+  async getRawSignedUploadUrl(
+    key: string,
+    contentType: string,
+    expiresInSeconds: number = 3600
+  ): Promise<string> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    return getSignedUrl(this.client, command, { expiresIn: expiresInSeconds });
+  }
+
+  /**
+   * Generate a pre-signed URL for downloading an object (raw key, no tenant prefix)
+   */
+  async getRawSignedDownloadUrl(
+    key: string,
+    expiresInSeconds: number = 3600
+  ): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+
+    return getSignedUrl(this.client, command, { expiresIn: expiresInSeconds });
+  }
+
+  /**
+   * Delete an object using raw key (no tenant prefix)
+   */
+  async deleteRaw(key: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      })
+    );
+  }
 }
 
 /**

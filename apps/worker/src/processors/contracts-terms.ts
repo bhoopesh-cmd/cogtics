@@ -1,15 +1,30 @@
 /**
  * Contract Term Extraction Processor
  * 
- * Extracts terms from contract clauses.
+ * Extracts terms from contract clauses using:
+ * 1. Rules engine (fast, deterministic) - primary
+ * 2. LLM fallback (GPT-4.1) - for low-confidence or missing terms
  */
 import type { Logger } from 'pino';
 import type { Kysely } from 'kysely';
 import type { Database } from '@cogtics/db';
 import type { TermExtractJobPayload } from '@cogtics/schemas';
-import { createContractTermId } from '@cogtics/schemas';
-import { contracts } from '@cogtics/utils';
+import { createContractTermId, createReviewQueueItemId } from '@cogtics/schemas';
+import { contracts, llm } from '@cogtics/utils';
 import { Queue } from 'bullmq';
+
+// Confidence thresholds
+const LOW_CONFIDENCE_THRESHOLD = 0.7;
+const REVIEW_REQUIRED_THRESHOLD = 0.5;
+
+// Required terms that trigger LLM fallback if missing
+const REQUIRED_TERM_TYPES: contracts.TermType[] = [
+  'pricing_model',
+  'billing_cadence', 
+  'contract_value',
+  'start_date',
+  'term_length',
+];
 
 interface JobResult {
   success: boolean;
@@ -122,10 +137,57 @@ export async function processTermExtractJob(
       clauseIdMap.set(index, clause.id);
     });
 
-    // Extract terms from clauses
-    const terms = contracts.extractTerms(clauseSegments);
+    // Step 1: Extract terms using rules engine (fast, deterministic)
+    let terms = contracts.extractTerms(clauseSegments);
+    logger.info({ documentId, termCount: terms.length }, 'Rules engine extracted terms');
 
-    logger.info({ documentId, termCount: terms.length }, 'Terms extracted');
+    // Step 2: Identify low-confidence and missing terms
+    const extractedTypes = new Set(terms.map(t => t.termType));
+    const lowConfidenceTerms = terms.filter(t => t.confidence < LOW_CONFIDENCE_THRESHOLD);
+    const missingRequiredTerms = REQUIRED_TERM_TYPES.filter(t => !extractedTypes.has(t));
+
+    // Step 3: LLM fallback for enhancement (if configured)
+    const llmClient = llm.createContractLLM();
+    
+    if (llmClient && (lowConfidenceTerms.length > 0 || missingRequiredTerms.length > 0)) {
+      logger.info({
+        documentId,
+        lowConfidenceCount: lowConfidenceTerms.length,
+        missingCount: missingRequiredTerms.length,
+      }, 'Invoking LLM fallback for enhancement');
+
+      try {
+        // Get document text for context
+        const document = await db
+          .selectFrom('contract_documents')
+          .select(['extracted_text', 'document_type'])
+          .where('id', '=', documentId)
+          .executeTakeFirst();
+
+        const textContext = document?.extracted_text?.substring(0, 10000) || '';
+        const termTypesToExtract = [
+          ...lowConfidenceTerms.map(t => t.termType),
+          ...missingRequiredTerms,
+        ];
+
+        // Call LLM for extraction
+        const llmExtractions = await llmClient.extractTerms(
+          textContext,
+          termTypesToExtract as contracts.TermType[],
+          { documentType: document?.document_type || undefined }
+        );
+
+        logger.info({
+          documentId,
+          llmExtractionCount: llmExtractions.length,
+        }, 'LLM extraction completed');
+
+        // Merge LLM extractions with rules-based terms
+        terms = mergeExtractions(terms, llmExtractions, logger);
+      } catch (llmError) {
+        logger.warn({ err: llmError, documentId }, 'LLM fallback failed, using rules-only extraction');
+      }
+    }
 
     // Delete existing terms for this contract version (in case of reprocessing)
     // Note: Overrides are preserved via overridesByType map from earlier query
@@ -136,6 +198,12 @@ export async function processTermExtractJob(
 
     // Insert term records (will reapply overrides)
     await insertTerms(db, tenantId, snapshotId, contractVersionId, terms, clauseIdMap, overridesByType, logger);
+
+    // Step 4: Create review queue items for low-confidence terms
+    const reviewItems = terms.filter(t => t.confidence < REVIEW_REQUIRED_THRESHOLD);
+    if (reviewItems.length > 0) {
+      await createReviewQueueItems(db, tenantId, snapshotId, contractVersionId, reviewItems, logger);
+    }
 
     // Enqueue readiness computation
     await enqueueReadinessJob(queues, tenantId, snapshotId, contractVersionId, logger);
@@ -264,5 +332,99 @@ async function enqueueReadinessJob(
       },
     });
     logger.info({ contractVersionId }, 'Enqueued readiness computation job');
+  }
+}
+
+/**
+ * Merge LLM extractions with rules-based terms
+ * LLM can boost confidence for existing terms or fill gaps for missing terms
+ */
+function mergeExtractions(
+  rulesTerms: contracts.ExtractedTerm[],
+  llmExtractions: llm.LLMExtraction[],
+  logger: Logger
+): contracts.ExtractedTerm[] {
+  const merged = [...rulesTerms];
+  const existingTypes = new Set(rulesTerms.map(t => t.termType));
+
+  for (const llmTerm of llmExtractions) {
+    if (existingTypes.has(llmTerm.termType)) {
+      // Find existing term and potentially boost confidence
+      const existingIndex = merged.findIndex(t => t.termType === llmTerm.termType);
+      if (existingIndex !== -1) {
+        const existing = merged[existingIndex];
+        
+        // If LLM has higher confidence and agrees with value, boost confidence
+        if (llmTerm.confidence > existing.confidence) {
+          merged[existingIndex] = {
+            ...existing,
+            confidence: Math.min((existing.confidence + llmTerm.confidence) / 2 + 0.1, 0.99),
+            extractionMethod: 'llm' as contracts.ExtractionMethod,
+          };
+          logger.debug({
+            termType: llmTerm.termType,
+            oldConfidence: existing.confidence,
+            newConfidence: merged[existingIndex].confidence,
+          }, 'LLM boosted term confidence');
+        }
+      }
+    } else {
+      // New term from LLM - add it
+      merged.push({
+        termType: llmTerm.termType,
+        value: llmTerm.value,
+        confidence: llmTerm.confidence,
+        sourceClauseIndex: 0,
+        extractionMethod: 'llm' as contracts.ExtractionMethod,
+        matchedText: llmTerm.matchedText,
+        startOffset: llmTerm.startOffset ?? 0,
+        endOffset: llmTerm.endOffset ?? 0,
+      });
+      logger.debug({
+        termType: llmTerm.termType,
+        confidence: llmTerm.confidence,
+      }, 'LLM added new term');
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Create review queue items for low-confidence terms
+ */
+async function createReviewQueueItems(
+  db: Kysely<Database>,
+  tenantId: string,
+  snapshotId: string,
+  contractVersionId: string,
+  terms: contracts.ExtractedTerm[],
+  logger: Logger
+): Promise<void> {
+  const reviewItems = terms.map(term => ({
+    id: createReviewQueueItemId(),
+    tenant_id: tenantId,
+    snapshot_id: snapshotId,
+    item_type: term.extractionMethod === 'llm' ? 'llm_extraction' as const : 'low_confidence_term' as const,
+    term_id: null, // Will be linked after term insertion
+    conflict_id: null,
+    document_id: null,
+    contract_version_id: contractVersionId,
+    bundle_id: null,
+    priority: term.confidence < 0.3 ? 2 : 1, // Higher priority for very low confidence
+    status: 'pending' as const,
+    assigned_to: null,
+    resolution_json: null,
+    resolved_by: null,
+    resolved_at: null,
+  }));
+
+  if (reviewItems.length > 0) {
+    await db
+      .insertInto('review_queue')
+      .values(reviewItems)
+      .execute();
+
+    logger.info({ count: reviewItems.length }, 'Created review queue items for low-confidence terms');
   }
 }

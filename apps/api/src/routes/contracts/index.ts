@@ -1,7 +1,8 @@
 /**
  * Contract Intelligence Routes (Phase 5)
  * 
- * API endpoints for contract documents, clauses, terms, overrides, and readiness.
+ * API endpoints for contract documents, clauses, terms, overrides, readiness,
+ * and the human review queue.
  */
 import { FastifyPluginAsync } from 'fastify';
 import { sql } from '@cogtics/db';
@@ -13,6 +14,7 @@ import {
   ReprocessRequestSchema,
   ClauseTypeSchema,
 } from '@cogtics/schemas';
+import { reviewRoutes } from './review.js';
 
 export const contractRoutes: FastifyPluginAsync = async (fastify) => {
   // ============================================
@@ -570,4 +572,9 @@ export const contractRoutes: FastifyPluginAsync = async (fastify) => {
       };
     },
   });
+
+  // ============================================
+  // Register Review Queue Routes
+  // ============================================
+  await fastify.register(reviewRoutes);
 };

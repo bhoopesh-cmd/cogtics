@@ -344,8 +344,9 @@ FROM issues
 GROUP BY tenant_id, snapshot_id, category, severity, status;
 
 -- migrate:down
-DROP VIEW IF EXISTS issue_summary_by_category CASCADE;
-DROP TABLE IF EXISTS issue_suppression_rules CASCADE;
+DROP VIEW IF EXISTS issues_summary CASCADE;
+DROP VIEW IF EXISTS detection_run_summary CASCADE;
+DROP VIEW IF EXISTS issues_with_details CASCADE;
 DROP TABLE IF EXISTS issue_status_history CASCADE;
 DROP TABLE IF EXISTS issue_sources CASCADE;
 DROP TABLE IF EXISTS issues CASCADE;

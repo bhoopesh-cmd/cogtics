@@ -431,3 +431,338 @@ export const DetectionRunListResponseSchema = z.object({
   total: z.number(),
 });
 export type DetectionRunListResponse = z.infer<typeof DetectionRunListResponseSchema>;
+
+// ============================================
+// Phase 8: Evidence Generation Schemas
+// ============================================
+
+// ID Generators for Evidence
+export function generateEvidenceId(): string {
+  return `evd_${nanoid(16)}`;
+}
+
+export function generateEvidenceSourceId(): string {
+  return `evs_${nanoid(16)}`;
+}
+
+export function generateEvidenceCalcId(): string {
+  return `evc_${nanoid(16)}`;
+}
+
+export function generateEvidenceClauseId(): string {
+  return `evcl_${nanoid(16)}`;
+}
+
+export function generateEvidenceAuditId(): string {
+  return `eva_${nanoid(16)}`;
+}
+
+export function generateEvidenceRunId(): string {
+  return `evr_${nanoid(16)}`;
+}
+
+// Evidence Type Enum
+export const EvidenceTypeSchema = z.enum([
+  'full',
+  'summary',
+  'calculation',
+  'clause',
+  'source',
+]);
+export type EvidenceType = z.infer<typeof EvidenceTypeSchema>;
+
+// Evidence Source Type (extends Issue Source Type)
+export const EvidenceSourceTypeSchema = z.enum([
+  'contract',
+  'invoice',
+  'invoice_line',
+  'payment',
+  'usage_event',
+  'schedule',
+  'obligation',
+  'customer',
+  'product',
+  'contract_term',
+  'contract_version',
+  'contract_document',
+]);
+export type EvidenceSourceType = z.infer<typeof EvidenceSourceTypeSchema>;
+
+// Calculation Type Enum
+export const CalculationTypeSchema = z.enum([
+  'expected_amount',
+  'actual_amount',
+  'variance',
+  'proration',
+  'discount',
+  'fx_conversion',
+  'revenue_allocation',
+  'custom',
+]);
+export type CalculationType = z.infer<typeof CalculationTypeSchema>;
+
+// Evidence Action Enum
+export const EvidenceActionSchema = z.enum([
+  'generated',
+  'regenerated',
+  'failed',
+  'expired',
+  'archived',
+]);
+export type EvidenceAction = z.infer<typeof EvidenceActionSchema>;
+
+// Evidence Trigger Type Enum
+export const EvidenceTriggerTypeSchema = z.enum([
+  'auto',
+  'manual',
+  'scheduled',
+  'detection_run',
+]);
+export type EvidenceTriggerType = z.infer<typeof EvidenceTriggerTypeSchema>;
+
+// Completeness Category
+export const CompletenessCategory = z.enum([
+  'source_coverage',
+  'contract_ready',
+  'calculation_reproducible',
+  'clause_linked',
+]);
+export type CompletenessCategory = z.infer<typeof CompletenessCategory>;
+
+// Issue Evidence Schema
+export const IssueEvidenceSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  snapshotId: z.string(),
+  issueId: z.string(),
+  evidenceVersion: z.number(),
+  evidenceType: EvidenceTypeSchema,
+  title: z.string(),
+  summary: z.string(),
+  dataJson: z.record(z.unknown()),
+  completenessScore: z.number().min(0).max(1),
+  completenessBreakdown: z.record(z.number()),
+  s3Key: z.string().nullable(),
+  ruleId: z.string().nullable().optional(),
+  ruleVersion: z.string().nullable().optional(),
+  createdAt: z.date(),
+});
+export type IssueEvidence = z.infer<typeof IssueEvidenceSchema>;
+
+// Issue Evidence Source Schema
+export const IssueEvidenceSourceSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  evidenceId: z.string(),
+  issueId: z.string(),
+  sourceType: EvidenceSourceTypeSchema,
+  sourceId: z.string(),
+  sourceSystem: z.string().nullable().optional(),
+  sourceExternalId: z.string().nullable().optional(),
+  fieldName: z.string().nullable().optional(),
+  fieldValueJson: z.unknown().optional(),
+  s3Key: z.string().nullable().optional(),
+  snapshotValueJson: z.unknown().optional(),
+  createdAt: z.date(),
+});
+export type IssueEvidenceSource = z.infer<typeof IssueEvidenceSourceSchema>;
+
+// Issue Evidence Calculation Schema
+export const IssueEvidenceCalculationSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  evidenceId: z.string(),
+  issueId: z.string(),
+  calcName: z.string(),
+  calcType: CalculationTypeSchema,
+  formula: z.string().nullable().optional(),
+  inputsJson: z.record(z.unknown()),
+  outputsJson: z.record(z.unknown()),
+  ruleId: z.string().nullable().optional(),
+  ruleVersion: z.string().nullable().optional(),
+  sequenceNumber: z.number(),
+  isReproducible: z.boolean(),
+  notes: z.string().nullable().optional(),
+  createdAt: z.date(),
+});
+export type IssueEvidenceCalculation = z.infer<typeof IssueEvidenceCalculationSchema>;
+
+// Issue Evidence Clause Schema
+export const IssueEvidenceClauseSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  evidenceId: z.string(),
+  issueId: z.string(),
+  clauseId: z.string().nullable().optional(),
+  contractId: z.string().nullable().optional(),
+  contractVersionId: z.string().nullable().optional(),
+  documentId: z.string().nullable().optional(),
+  clauseType: z.string().nullable().optional(),
+  clauseLabel: z.string().nullable().optional(),
+  excerpt: z.string(),
+  fullTextS3Key: z.string().nullable().optional(),
+  startOffset: z.number().nullable().optional(),
+  endOffset: z.number().nullable().optional(),
+  pageNumber: z.number().nullable().optional(),
+  relevanceScore: z.number().min(0).max(1).nullable().optional(),
+  createdAt: z.date(),
+});
+export type IssueEvidenceClause = z.infer<typeof IssueEvidenceClauseSchema>;
+
+// Issue Evidence Audit Schema
+export const IssueEvidenceAuditSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  issueId: z.string(),
+  evidenceId: z.string().nullable().optional(),
+  evidenceVersion: z.number(),
+  action: EvidenceActionSchema,
+  status: z.enum(['pending', 'processing', 'completed', 'failed']),
+  triggerType: EvidenceTriggerTypeSchema,
+  actorUserId: z.string().nullable().optional(),
+  previousVersion: z.number().nullable().optional(),
+  completenessScore: z.number().min(0).max(1).nullable().optional(),
+  processingTimeMs: z.number().nullable().optional(),
+  errorCode: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+  metadataJson: z.record(z.unknown()).optional(),
+  generatedAt: z.date(),
+  createdAt: z.date(),
+});
+export type IssueEvidenceAudit = z.infer<typeof IssueEvidenceAuditSchema>;
+
+// Evidence Generation Run Schema
+export const EvidenceGenerationRunSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  snapshotId: z.string(),
+  detectionRunId: z.string().nullable().optional(),
+  status: z.enum(['pending', 'running', 'completed', 'failed', 'cancelled']),
+  totalIssues: z.number(),
+  processedIssues: z.number(),
+  failedIssues: z.number(),
+  skippedIssues: z.number(),
+  avgCompletenessScore: z.number().min(0).max(1).nullable().optional(),
+  statsJson: z.record(z.unknown()).optional(),
+  errorCode: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+  startedAt: z.date().nullable().optional(),
+  finishedAt: z.date().nullable().optional(),
+  createdAt: z.date(),
+});
+export type EvidenceGenerationRun = z.infer<typeof EvidenceGenerationRunSchema>;
+
+// Calculation Step (used by rules)
+export const CalculationStepSchema = z.object({
+  name: z.string(),
+  formula: z.string(),
+  inputs: z.record(z.number()),
+  output: z.number(),
+  ruleId: z.string(),
+  ruleVersion: z.string(),
+});
+export type CalculationStep = z.infer<typeof CalculationStepSchema>;
+
+// Evidence Pack Structure
+export const EvidencePackSchema = z.object({
+  summary: z.string(),
+  expected: z.record(z.unknown()),
+  actual: z.record(z.unknown()),
+  variance: z.object({
+    amount: z.number().nullable().optional(),
+    percentage: z.number().nullable().optional(),
+    direction: z.enum(['over', 'under', 'none']).optional(),
+    description: z.string().optional(),
+  }),
+  calculations: z.array(CalculationStepSchema),
+  contractClauses: z.array(z.object({
+    clauseId: z.string().optional(),
+    type: z.string(),
+    label: z.string().nullable().optional(),
+    excerpt: z.string(),
+    startOffset: z.number().optional(),
+    endOffset: z.number().optional(),
+    pageNumber: z.number().optional(),
+  })),
+  sourceRecords: z.array(z.object({
+    sourceType: EvidenceSourceTypeSchema,
+    sourceId: z.string(),
+    sourceSystem: z.string().optional(),
+    externalId: z.string().optional(),
+    fieldName: z.string().optional(),
+    fieldValue: z.unknown().optional(),
+  })),
+  snapshotMetadata: z.object({
+    snapshotId: z.string(),
+    snapshotDate: z.string(),
+    rulesetVersion: z.string(),
+    ruleId: z.string(),
+    ruleVersion: z.string(),
+    detectionRunId: z.string().optional(),
+  }),
+});
+export type EvidencePack = z.infer<typeof EvidencePackSchema>;
+
+// API Request/Response Schemas
+
+export const GetEvidenceQuerySchema = z.object({
+  includeCalculations: z.coerce.boolean().optional().default(true),
+  includeClauses: z.coerce.boolean().optional().default(true),
+  includeSources: z.coerce.boolean().optional().default(true),
+  includeAudit: z.coerce.boolean().optional().default(false),
+});
+export type GetEvidenceQuery = z.infer<typeof GetEvidenceQuerySchema>;
+
+export const RegenerateEvidenceRequestSchema = z.object({
+  force: z.boolean().optional().default(false),
+  reason: z.string().optional(),
+});
+export type RegenerateEvidenceRequest = z.infer<typeof RegenerateEvidenceRequestSchema>;
+
+export const EvidenceResponseSchema = z.object({
+  evidence: IssueEvidenceSchema,
+  sources: z.array(IssueEvidenceSourceSchema),
+  calculations: z.array(IssueEvidenceCalculationSchema),
+  clauses: z.array(IssueEvidenceClauseSchema),
+  audit: z.array(IssueEvidenceAuditSchema),
+  downloadUrl: z.string().nullable().optional(),
+});
+export type EvidenceResponse = z.infer<typeof EvidenceResponseSchema>;
+
+export const EvidenceSummaryResponseSchema = z.object({
+  issueId: z.string(),
+  evidenceVersion: z.number(),
+  title: z.string(),
+  summary: z.string(),
+  completenessScore: z.number(),
+  completenessBreakdown: z.record(z.number()),
+  hasS3Artifact: z.boolean(),
+  sourcesCount: z.number(),
+  calculationsCount: z.number(),
+  clausesCount: z.number(),
+  generatedAt: z.date(),
+});
+export type EvidenceSummaryResponse = z.infer<typeof EvidenceSummaryResponseSchema>;
+
+// Job Payloads
+export const EvidenceGenerateJobPayloadSchema = z.object({
+  type: z.literal('evidence.generate'),
+  tenantId: TenantIdSchema,
+  snapshotId: z.string(),
+  detectionRunId: z.string().optional(),
+  issueIds: z.array(z.string()).optional(),
+  force: z.boolean().optional().default(false),
+  requestId: z.string().optional(),
+});
+export type EvidenceGenerateJobPayload = z.infer<typeof EvidenceGenerateJobPayloadSchema>;
+
+export const EvidenceRegenerateJobPayloadSchema = z.object({
+  type: z.literal('evidence.regenerate'),
+  tenantId: TenantIdSchema,
+  issueId: z.string(),
+  force: z.boolean().optional().default(false),
+  actorUserId: z.string().optional(),
+  reason: z.string().optional(),
+  requestId: z.string().optional(),
+});
+export type EvidenceRegenerateJobPayload = z.infer<typeof EvidenceRegenerateJobPayloadSchema>;

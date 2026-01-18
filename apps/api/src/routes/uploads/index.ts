@@ -60,7 +60,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
           file_name: body.fileName,
           content_type: body.contentType,
           s3_key: s3Key,
-          size_bytes: 0,
+          size_bytes: body.fileSize ?? 0,
           metadata_json: {},
         })
         .execute();
@@ -146,12 +146,14 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         })
         .execute();
 
-      // Update upload status
+      // Update upload status to processing (file is uploaded, now being parsed)
+      // If autoProcess is false, mark as completed immediately
       await fastify.db
         .updateTable('uploads')
         .set({
-          status: 'uploading',
+          status: body.autoProcess ? 'processing' : 'completed',
           started_at: new Date(),
+          completed_at: body.autoProcess ? null : new Date(),
         })
         .where('id', '=', body.uploadId)
         .execute();
@@ -159,12 +161,15 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       // Enqueue parse job
       if (body.autoProcess) {
         await fastify.jobQueue.add('upload.csv.parse', {
-          type: 'upload.csv.parse',
           tenantId,
-          uploadId: body.uploadId,
-          fileId: file.id,
-          parseRunId,
-          mapping: body.mapping,
+          payload: {
+            type: 'upload.csv.parse',
+            tenantId,
+            uploadId: body.uploadId,
+            fileId: file.id,
+            parseRunId,
+            mapping: body.mapping,
+          },
         });
       }
 
@@ -218,7 +223,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
           file_name: body.fileName,
           content_type: body.contentType,
           s3_key: s3Key,
-          size_bytes: 0,
+          size_bytes: body.fileSize ?? 0,
           metadata_json: {},
         })
         .execute();
@@ -288,12 +293,14 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         })
         .execute();
 
-      // Update upload status
+      // Update upload status to processing (file is uploaded, now being parsed)
+      // If autoProcess is false, mark as completed immediately
       await fastify.db
         .updateTable('uploads')
         .set({
-          status: 'uploading',
+          status: body.autoProcess ? 'processing' : 'completed',
           started_at: new Date(),
+          completed_at: body.autoProcess ? null : new Date(),
         })
         .where('id', '=', body.uploadId)
         .execute();
@@ -301,11 +308,14 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       // Enqueue PDF parse job
       if (body.autoProcess) {
         await fastify.jobQueue.add('upload.pdf.parse', {
-          type: 'upload.pdf.parse',
           tenantId,
-          uploadId: body.uploadId,
-          fileId: file.id,
-          parseRunId,
+          payload: {
+            type: 'upload.pdf.parse',
+            tenantId,
+            uploadId: body.uploadId,
+            fileId: file.id,
+            parseRunId,
+          },
         });
       }
 
@@ -627,12 +637,15 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       // Enqueue job based on type
       const jobType = upload.type === 'csv' ? 'upload.csv.parse' : 'upload.pdf.parse';
       await fastify.jobQueue.add(jobType, {
-        type: jobType,
         tenantId,
-        uploadId: id,
-        fileId: file.id,
-        parseRunId,
-        mapping: mapping?.mapping_json,
+        payload: {
+          type: jobType,
+          tenantId,
+          uploadId: id,
+          fileId: file.id,
+          parseRunId,
+          mapping: mapping?.mapping_json,
+        },
       });
 
       return reply.send({

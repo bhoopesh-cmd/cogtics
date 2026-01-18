@@ -41,5 +41,23 @@ export {
   isInHierarchy,
 } from './deduplicator.js';
 
+// Calculations (Phase 8)
+export {
+  CalculationRecorder,
+  createCalculationRecorder,
+  calculateMonthlyFromArr,
+  calculateQuarterlyFromArr,
+  calculateVariance,
+  calculateProratedAmount,
+  calculateDiscountedAmount,
+  calculateFxAmount,
+  calculateCompletenessScore,
+  getCompletenessLabel,
+  type CalcType,
+  type RecordCalculationInput,
+  type CompletenessBreakdown,
+  type CompletenessInput,
+} from './calculations.js';
+
 // Rules
 export * from './rules/index.js';

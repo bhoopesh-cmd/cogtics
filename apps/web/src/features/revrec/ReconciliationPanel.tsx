@@ -36,12 +36,13 @@ export function ReconciliationPanel({ snapshotId }: ReconciliationPanelProps) {
   async function loadReconciliations() {
     setLoading(true);
     try {
-      const data = await listRevRecReconciliations({ 
+      const res = await listRevRecReconciliations({ 
         snapshotId, 
         status: statusFilter !== 'all' ? statusFilter : undefined,
         limit: 100,
       });
-      setReconciliations(data.reconciliations);
+      if (!res.ok) throw new Error(res.error);
+      setReconciliations(res.data.reconciliations || []);
     } catch (err) {
       console.error('Failed to load reconciliations:', err);
     } finally {

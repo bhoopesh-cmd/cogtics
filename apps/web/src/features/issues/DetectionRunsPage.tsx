@@ -26,8 +26,12 @@ export function DetectionRunsPage() {
   async function loadRuns() {
     setLoading(true);
     try {
-      const data = await api.listDetectionRuns({ limit: 50 });
-      setRuns(data.runs);
+      const res = await api.listDetectionRuns({ limit: 50 });
+      if (!res.ok) {
+        console.error('Failed to load runs:', res.error);
+        return;
+      }
+      setRuns(res.data.runs ?? []);
     } catch (err) {
       console.error('Failed to load runs:', err);
     } finally {
@@ -37,8 +41,12 @@ export function DetectionRunsPage() {
 
   async function loadRunDetail(runId: string) {
     try {
-      const data = await api.getDetectionRun(runId);
-      setRunDetail(data);
+      const res = await api.getDetectionRun(runId);
+      if (!res.ok) {
+        console.error('Failed to load run detail:', res.error);
+        return;
+      }
+      setRunDetail(res.data);
     } catch (err) {
       console.error('Failed to load run detail:', err);
     }
@@ -46,7 +54,11 @@ export function DetectionRunsPage() {
 
   async function handleReplay(runId: string) {
     try {
-      await api.replayDetectionRun(runId);
+      const res = await api.replayDetectionRun(runId);
+      if (!res.ok) {
+        alert('Failed to start replay: ' + (res.error || 'Unknown error'));
+        return;
+      }
       alert('Replay started');
       loadRuns();
     } catch (err) {
@@ -94,12 +106,12 @@ export function DetectionRunsPage() {
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ff6500]"></div>
             </div>
-          ) : runs.length === 0 ? (
+          ) : (runs?.length ?? 0) === 0 ? (
             <div className="text-center py-12 text-zinc-500">
               No detection runs found.
             </div>
           ) : (
-            runs.map((run) => (
+            (runs ?? []).map((run) => (
               <div
                 key={run.id}
                 onClick={() => { setSelectedRun(run.id); loadRunDetail(run.id); }}

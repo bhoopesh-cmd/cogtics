@@ -1,6 +1,14 @@
 import { Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
-import { loadWorkerConfig, createLogger } from '@cogtics/utils';
+import { 
+  loadWorkerConfig, 
+  createLogger,
+  initTelemetrySync,
+  initMetrics,
+  recordJobCompletion,
+  getTracer,
+  startSpan,
+} from '@cogtics/utils';
 import { getDatabase, closeDatabase } from '@cogtics/db';
 import { JobPayloadSchema, type QueueName } from '@cogtics/schemas';
 import { initializeConnectors, initializeEncryptor } from '@cogtics/connectors';
@@ -33,9 +41,21 @@ import { processRevRecReconcileJob } from './processors/revrec-reconcile.js';
 // Phase 7 Detection Engine Processors
 import { processDetectRunJob } from './processors/detect-run.js';
 import { processDetectReplayJob } from './processors/detect-replay.js';
+// Phase 8 Evidence Generation Processors
+import { processEvidenceGenerateJob } from './processors/evidence-generate.js';
+import { processEvidenceRegenerateJob } from './processors/evidence-regenerate.js';
+// Phase 9 Simulation Engine Processors
+import { processSimulationRunJob } from './processors/simulation-run.js';
+import { processSimulationReplayJob } from './processors/simulation-replay.js';
+// Phase 10 Exports & Digests Processors
+import { processExportCsvJob } from './processors/export-csv.js';
+import { processExportPdfJob } from './processors/export-pdf.js';
+import { processDigestSendJob } from './processors/digest-send.js';
 // Storage client for file operations
 import { createStorageClient } from '@cogtics/utils';
 import { Queue } from 'bullmq';
+// Phase 10 Scheduler
+import { Scheduler } from './scheduler.js';
 
 const QUEUE_NAMES: QueueName[] = [
   'sync',
@@ -63,13 +83,63 @@ const QUEUE_NAMES: QueueName[] = [
   // Phase 7 Detection Engine
   'detect.run',
   'detect.replay',
+  // Phase 8 Evidence Generation
+  'evidence.generate',
+  'evidence.regenerate',
+  // Phase 9 Simulation Engine
+  'simulation.run',
+  'simulation.replay',
+  // Phase 10 Exports & Digests
+  'export.csv.generate',
+  'export.pdf.render',
+  'digest.send',
 ];
+
+// Retry policies per job type (Phase 11)
+const RETRY_POLICIES: Record<string, { maxRetries: number; backoffType: 'exponential' | 'fixed'; baseDelay: number }> = {
+  'sync': { maxRetries: 5, backoffType: 'exponential', baseDelay: 1000 },
+  'ingest.load': { maxRetries: 3, backoffType: 'exponential', baseDelay: 2000 },
+  'ingest.normalize': { maxRetries: 3, backoffType: 'exponential', baseDelay: 2000 },
+  'ingest.upsert': { maxRetries: 3, backoffType: 'exponential', baseDelay: 2000 },
+  'ingest.finalize': { maxRetries: 3, backoffType: 'exponential', baseDelay: 2000 },
+  'ingest.full': { maxRetries: 3, backoffType: 'exponential', baseDelay: 2000 },
+  'detect.run': { maxRetries: 3, backoffType: 'exponential', baseDelay: 5000 },
+  'detect.replay': { maxRetries: 3, backoffType: 'exponential', baseDelay: 5000 },
+  'evidence.generate': { maxRetries: 3, backoffType: 'exponential', baseDelay: 2000 },
+  'evidence.regenerate': { maxRetries: 3, backoffType: 'exponential', baseDelay: 2000 },
+  'export.csv.generate': { maxRetries: 2, backoffType: 'fixed', baseDelay: 30000 },
+  'export.pdf.render': { maxRetries: 2, backoffType: 'fixed', baseDelay: 30000 },
+  'digest.send': { maxRetries: 3, backoffType: 'exponential', baseDelay: 60000 },
+  'simulation.run': { maxRetries: 3, backoffType: 'exponential', baseDelay: 5000 },
+  'simulation.replay': { maxRetries: 3, backoffType: 'exponential', baseDelay: 5000 },
+};
+
+function getRetryPolicy(queueName: string) {
+  return RETRY_POLICIES[queueName] || { maxRetries: 3, backoffType: 'exponential', baseDelay: 1000 };
+}
 
 async function main() {
   const config = loadWorkerConfig();
+  
+  // Initialize OpenTelemetry (Phase 11)
+  const telemetryEnabled = process.env['OTEL_ENABLED'] === 'true';
+  if (telemetryEnabled) {
+    initTelemetrySync({
+      serviceName: 'cogtics-worker',
+      serviceVersion: process.env['npm_package_version'] || '0.0.0',
+      environment: config.NODE_ENV,
+      prometheusPort: parseInt(process.env['WORKER_PROMETHEUS_PORT'] || '9465', 10),
+      otlpEndpoint: process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] || 'http://localhost:4318/v1/traces',
+      enabled: true,
+    });
+    initMetrics('cogtics-worker');
+  }
+
   const logger = createLogger({
     name: 'cogtics-worker',
     level: config.LOG_LEVEL,
+    lokiUrl: process.env['LOKI_URL'],
+    enableTraceContext: telemetryEnabled,
   });
 
   logger.info('Starting worker...');
@@ -81,6 +151,9 @@ async function main() {
     logger.info('Token encryptor initialized');
   }
 
+  // Get tracer for job spans
+  const tracer = getTracer('cogtics-worker');
+
   // Initialize database
   const db = getDatabase({ connectionString: config.DATABASE_URL });
 
@@ -89,10 +162,11 @@ async function main() {
   function getStorageClient() {
     if (!storageClient) {
       storageClient = createStorageClient({
-        endpoint: process.env.MINIO_ENDPOINT ?? 'http://localhost:9000',
-        accessKeyId: process.env.MINIO_ACCESS_KEY ?? 'minioadmin',
-        secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin',
-        bucket: process.env.MINIO_BUCKET ?? 'cogtics-uploads',
+        endpoint: process.env.S3_ENDPOINT ?? process.env.MINIO_ENDPOINT ?? 'http://localhost:9000',
+        accessKey: process.env.S3_ACCESS_KEY ?? process.env.MINIO_ACCESS_KEY ?? 'minioadmin',
+        secretKey: process.env.S3_SECRET_KEY ?? process.env.MINIO_SECRET_KEY ?? 'minioadmin',
+        bucket: process.env.S3_BUCKET ?? process.env.MINIO_BUCKET ?? 'cogtics-uploads',
+        region: process.env.S3_REGION ?? 'us-east-1',
       });
     }
     return storageClient;
@@ -113,6 +187,10 @@ async function main() {
   const workers: Worker[] = [];
 
   for (const queueName of QUEUE_NAMES) {
+    // Capture retry policy for this queue to avoid closure issues
+    const retryPolicy = getRetryPolicy(queueName);
+    const capturedRetryPolicy = { ...retryPolicy }; // Explicit copy for closure
+    
     const worker = new Worker(
       queueName,
       async (job: Job) => {
@@ -120,19 +198,28 @@ async function main() {
           jobId: job.id,
           queue: queueName,
           tenantId: job.data.tenantId,
+          attemptsMade: job.attemptsMade,
         });
 
-        jobLogger.info({ payload: job.data.payload }, 'Processing job');
+        jobLogger.info({ payload: job.data.payload, attempt: job.attemptsMade + 1 }, 'Processing job');
+        const startTime = Date.now();
 
-        try {
-          // Validate job payload
-          const parseResult = JobPayloadSchema.safeParse(job.data.payload);
-          if (!parseResult.success) {
-            throw new Error(`Invalid job payload: ${parseResult.error.message}`);
-          }
+        // Wrap job processing in a trace span (Phase 11)
+        return startSpan(tracer, `job.${queueName}`, {
+          'job.id': job.id || '',
+          'job.queue': queueName,
+          'job.tenant_id': job.data.tenantId || '',
+          'job.attempt': job.attemptsMade + 1,
+        }, async (span) => {
+          try {
+            // Validate job payload
+            const parseResult = JobPayloadSchema.safeParse(job.data.payload);
+            if (!parseResult.success) {
+              throw new Error(`Invalid job payload: ${parseResult.error.message}`);
+            }
 
-          const payload = parseResult.data;
-          const startTime = Date.now();
+            const payload = parseResult.data;
+            span.setAttribute('job.type', payload.type);
 
           // Update job status to processing
           await db
@@ -217,67 +304,114 @@ async function main() {
             case 'detect.replay':
               result = await processDetectReplayJob(payload, jobLogger, db);
               break;
+            // Phase 8: Evidence Generation
+            case 'evidence.generate':
+              result = await processEvidenceGenerateJob(payload, jobLogger, db);
+              break;
+            case 'evidence.regenerate':
+              result = await processEvidenceRegenerateJob(payload, jobLogger, db);
+              break;
+            // Phase 9: Simulation Engine
+            case 'simulation.run':
+              result = await processSimulationRunJob(payload, jobLogger, db);
+              break;
+            case 'simulation.replay':
+              result = await processSimulationReplayJob(payload, jobLogger, db);
+              break;
+            // Phase 10: Exports & Digests
+            case 'export.csv.generate':
+              result = await processExportCsvJob(payload, jobLogger, db, getStorageClient());
+              break;
+            case 'export.pdf.render':
+              result = await processExportPdfJob(payload, jobLogger, db, getStorageClient());
+              break;
+            case 'digest.send':
+              result = await processDigestSendJob(payload, jobLogger, db);
+              break;
             default:
               throw new Error(`Unknown job type`);
           }
 
-          const processingTimeMs = Date.now() - startTime;
+            const processingTimeMs = Date.now() - startTime;
+            span.setAttribute('job.duration_ms', processingTimeMs);
 
-          // Update job status to completed
-          await db
-            .updateTable('jobs')
-            .set({
-              status: 'completed',
-              result_json: { ...result, processingTimeMs },
-              updated_at: new Date(),
-              completed_at: new Date(),
-            })
-            .where('id', '=', job.data.jobId)
-            .execute();
+            // Record metrics (Phase 11)
+            recordJobCompletion(payload.type, 'success', processingTimeMs, job.attemptsMade);
 
-          // Update idempotency key if present
-          const jobRecord = await db
-            .selectFrom('jobs')
-            .select('idempotency_key_id')
-            .where('id', '=', job.data.jobId)
-            .executeTakeFirst();
-
-          if (jobRecord?.idempotency_key_id) {
+            // Update job status to completed
             await db
-              .updateTable('idempotency_keys')
+              .updateTable('jobs')
               .set({
                 status: 'completed',
-                response_json: { jobId: job.data.jobId, result },
+                result_json: { ...result, processingTimeMs },
+                updated_at: new Date(),
+                completed_at: new Date(),
               })
-              .where('id', '=', jobRecord.idempotency_key_id)
+              .where('id', '=', job.data.jobId)
               .execute();
+
+            // Update idempotency key if present
+            const jobRecord = await db
+              .selectFrom('jobs')
+              .select('idempotency_key_id')
+              .where('id', '=', job.data.jobId)
+              .executeTakeFirst();
+
+            if (jobRecord?.idempotency_key_id) {
+              await db
+                .updateTable('idempotency_keys')
+                .set({
+                  status: 'completed',
+                  response_json: { jobId: job.data.jobId, result },
+                })
+                .where('id', '=', jobRecord.idempotency_key_id)
+                .execute();
+            }
+
+            jobLogger.info({ result, processingTimeMs }, 'Job completed');
+            return result;
+          } catch (err) {
+            const processingTimeMs = Date.now() - startTime;
+            jobLogger.error({ err, processingTimeMs, attempt: job.attemptsMade + 1 }, 'Job failed');
+
+            // Record failure metrics (Phase 11)
+            const jobType = job.data.payload?.type || queueName;
+            recordJobCompletion(jobType, 'failure', processingTimeMs, job.attemptsMade);
+
+            // Update job status to failed
+            await db
+              .updateTable('jobs')
+              .set({
+                status: 'failed',
+                result_json: {
+                  success: false,
+                  error: err instanceof Error ? err.message : 'Unknown error',
+                  attempt: job.attemptsMade + 1,
+                },
+                updated_at: new Date(),
+              })
+              .where('id', '=', job.data.jobId)
+              .execute();
+
+            throw err;
           }
-
-          jobLogger.info({ result, processingTimeMs }, 'Job completed');
-          return result;
-        } catch (err) {
-          jobLogger.error({ err }, 'Job failed');
-
-          // Update job status to failed
-          await db
-            .updateTable('jobs')
-            .set({
-              status: 'failed',
-              result_json: {
-                success: false,
-                error: err instanceof Error ? err.message : 'Unknown error',
-              },
-              updated_at: new Date(),
-            })
-            .where('id', '=', job.data.jobId)
-            .execute();
-
-          throw err;
-        }
+        });
       },
       {
         connection: redis,
         concurrency: config.WORKER_CONCURRENCY,
+        // Apply retry policy per queue type (Phase 11)
+        settings: {
+          backoffStrategy: (attemptsMade: number) => {
+            if (capturedRetryPolicy.backoffType === 'fixed') {
+              return capturedRetryPolicy.baseDelay;
+            }
+            // Exponential backoff with jitter
+            const delay = capturedRetryPolicy.baseDelay * Math.pow(2, attemptsMade);
+            const jitter = delay * 0.1 * Math.random();
+            return Math.min(delay + jitter, 300000); // Max 5 minutes
+          },
+        },
       }
     );
 
@@ -285,14 +419,37 @@ async function main() {
       logger.error({ err, queue: queueName }, 'Worker error');
     });
 
+    worker.on('failed', (job, err) => {
+      if (job) {
+        logger.warn({
+          jobId: job.id,
+          queue: queueName,
+          attempt: job.attemptsMade,
+          maxAttempts: capturedRetryPolicy.maxRetries,
+          error: err.message,
+        }, 'Job failed, will retry if attempts remaining');
+      }
+    });
+
     workers.push(worker);
-    logger.info(`Worker started for queue: ${queueName}`);
+    logger.info({ queue: queueName, maxRetries: capturedRetryPolicy.maxRetries }, 'Worker started');
   }
+
+  // Initialize and start scheduler (Phase 10)
+  const scheduler = new Scheduler({
+    logger,
+    db,
+    redis,
+    enabled: process.env.SCHEDULER_ENABLED !== 'false', // Default enabled
+    intervalMs: parseInt(process.env.SCHEDULER_INTERVAL_MS || '60000', 10),
+  });
+  scheduler.start();
 
   // Graceful shutdown
   const shutdown = async () => {
-    logger.info('Shutting down workers...');
+    logger.info('Shutting down workers and scheduler...');
     
+    await scheduler.stop();
     await Promise.all(workers.map((w) => w.close()));
     await redis.quit();
     await closeDatabase();
@@ -304,7 +461,7 @@ async function main() {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
-  logger.info('All workers started and ready');
+  logger.info('All workers and scheduler started and ready');
 }
 
 /**

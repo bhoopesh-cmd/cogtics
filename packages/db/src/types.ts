@@ -1295,6 +1295,562 @@ export type FxRate = Selectable<FxRatesTable>;
 export type NewFxRate = Insertable<FxRatesTable>;
 
 // ============================================
+// Issue Evidence (Phase 8)
+// ============================================
+
+export interface IssueEvidenceTable {
+  id: string;
+  tenant_id: string;
+  snapshot_id: string;
+  issue_id: string;
+  evidence_version: number;
+  evidence_type: 'full' | 'summary' | 'calculation' | 'clause' | 'source';
+  title: string;
+  summary: string;
+  data_json: unknown;
+  completeness_score: number;
+  completeness_breakdown: unknown;
+  s3_key: string | null;
+  rule_id: string | null;
+  rule_version: string | null;
+  created_at: Generated<Date>;
+}
+
+export type IssueEvidence = Selectable<IssueEvidenceTable>;
+export type NewIssueEvidence = Insertable<IssueEvidenceTable>;
+
+// ============================================
+// Issue Evidence Sources (Phase 8)
+// ============================================
+
+export interface IssueEvidenceSourcesTable {
+  id: string;
+  tenant_id: string;
+  evidence_id: string;
+  issue_id: string;
+  source_type: 'contract' | 'invoice' | 'invoice_line' | 'payment' | 'usage_event' | 'schedule' | 'obligation' | 'customer' | 'product' | 'contract_term' | 'contract_version' | 'contract_document';
+  source_id: string;
+  source_system: string | null;
+  source_external_id: string | null;
+  field_name: string | null;
+  field_value_json: unknown;
+  s3_key: string | null;
+  snapshot_value_json: unknown;
+  created_at: Generated<Date>;
+}
+
+export type IssueEvidenceSource = Selectable<IssueEvidenceSourcesTable>;
+export type NewIssueEvidenceSource = Insertable<IssueEvidenceSourcesTable>;
+
+// ============================================
+// Issue Evidence Calculations (Phase 8)
+// ============================================
+
+export interface IssueEvidenceCalculationsTable {
+  id: string;
+  tenant_id: string;
+  evidence_id: string;
+  issue_id: string;
+  calc_name: string;
+  calc_type: 'expected_amount' | 'actual_amount' | 'variance' | 'proration' | 'discount' | 'fx_conversion' | 'revenue_allocation' | 'custom';
+  formula: string | null;
+  inputs_json: unknown;
+  outputs_json: unknown;
+  rule_id: string | null;
+  rule_version: string | null;
+  sequence_number: number;
+  is_reproducible: boolean;
+  notes: string | null;
+  created_at: Generated<Date>;
+}
+
+export type IssueEvidenceCalculation = Selectable<IssueEvidenceCalculationsTable>;
+export type NewIssueEvidenceCalculation = Insertable<IssueEvidenceCalculationsTable>;
+
+// ============================================
+// Issue Evidence Clauses (Phase 8)
+// ============================================
+
+export interface IssueEvidenceClausesTable {
+  id: string;
+  tenant_id: string;
+  evidence_id: string;
+  issue_id: string;
+  clause_id: string | null;
+  contract_id: string | null;
+  contract_version_id: string | null;
+  document_id: string | null;
+  clause_type: 'heading' | 'section' | 'paragraph' | 'list_item' | 'excerpt' | null;
+  clause_label: string | null;
+  excerpt: string;
+  full_text_s3_key: string | null;
+  start_offset: number | null;
+  end_offset: number | null;
+  page_number: number | null;
+  relevance_score: number | null;
+  created_at: Generated<Date>;
+}
+
+export type IssueEvidenceClause = Selectable<IssueEvidenceClausesTable>;
+export type NewIssueEvidenceClause = Insertable<IssueEvidenceClausesTable>;
+
+// ============================================
+// Issue Evidence Audit (Phase 8)
+// ============================================
+
+export interface IssueEvidenceAuditTable {
+  id: string;
+  tenant_id: string;
+  issue_id: string;
+  evidence_id: string | null;
+  evidence_version: number;
+  action: 'generated' | 'regenerated' | 'failed' | 'expired' | 'archived';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  trigger_type: 'auto' | 'manual' | 'scheduled' | 'detection_run';
+  actor_user_id: string | null;
+  previous_version: number | null;
+  completeness_score: number | null;
+  processing_time_ms: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  metadata_json: unknown;
+  generated_at: Generated<Date>;
+  created_at: Generated<Date>;
+}
+
+export type IssueEvidenceAudit = Selectable<IssueEvidenceAuditTable>;
+export type NewIssueEvidenceAudit = Insertable<IssueEvidenceAuditTable>;
+
+// ============================================
+// Evidence Generation Runs (Phase 8)
+// ============================================
+
+export interface EvidenceGenerationRunsTable {
+  id: string;
+  tenant_id: string;
+  snapshot_id: string;
+  detection_run_id: string | null;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  total_issues: number;
+  processed_issues: number;
+  failed_issues: number;
+  skipped_issues: number;
+  avg_completeness_score: number | null;
+  stats_json: unknown;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: Date | null;
+  finished_at: Date | null;
+  created_at: Generated<Date>;
+}
+
+export type EvidenceGenerationRun = Selectable<EvidenceGenerationRunsTable>;
+export type NewEvidenceGenerationRun = Insertable<EvidenceGenerationRunsTable>;
+export type EvidenceGenerationRunUpdate = Updateable<EvidenceGenerationRunsTable>;
+
+// ============================================
+// Simulation Templates (Phase 9)
+// ============================================
+
+export interface SimulationTemplatesTable {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  template_json: unknown;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export type SimulationTemplate = Selectable<SimulationTemplatesTable>;
+export type NewSimulationTemplate = Insertable<SimulationTemplatesTable>;
+export type SimulationTemplateUpdate = Updateable<SimulationTemplatesTable>;
+
+// ============================================
+// Simulations (Phase 9)
+// ============================================
+
+export interface SimulationsTable {
+  id: string;
+  tenant_id: string;
+  snapshot_id: string;
+  name: string;
+  description: string | null;
+  status: 'draft' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  template_id: string | null;
+  created_by: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export type Simulation = Selectable<SimulationsTable>;
+export type NewSimulation = Insertable<SimulationsTable>;
+export type SimulationUpdate = Updateable<SimulationsTable>;
+
+// ============================================
+// Simulation Overrides (Phase 9)
+// ============================================
+
+export interface SimulationOverridesTable {
+  id: string;
+  tenant_id: string;
+  simulation_id: string;
+  override_type: 'contract_term' | 'usage_adjustment' | 'billing_adjustment' | 'timing_shift' | 'discount_change' | 'price_change';
+  target_type: 'contract' | 'invoice' | 'customer' | 'obligation' | 'line_item';
+  target_id: string;
+  field_path: string | null;
+  original_value_json: unknown | null;
+  override_value_json: unknown;
+  sequence_number: number;
+  is_valid: boolean;
+  validation_message: string | null;
+  created_at: Generated<Date>;
+}
+
+export type SimulationOverride = Selectable<SimulationOverridesTable>;
+export type NewSimulationOverride = Insertable<SimulationOverridesTable>;
+
+// ============================================
+// Simulation Runs (Phase 9)
+// ============================================
+
+export interface SimulationRunsTable {
+  id: string;
+  tenant_id: string;
+  simulation_id: string;
+  run_number: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  started_at: Date | null;
+  finished_at: Date | null;
+  processing_time_ms: number | null;
+  triggered_by: string | null;
+  options_json: unknown;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: Generated<Date>;
+}
+
+export type SimulationRun = Selectable<SimulationRunsTable>;
+export type NewSimulationRun = Insertable<SimulationRunsTable>;
+export type SimulationRunUpdate = Updateable<SimulationRunsTable>;
+
+// ============================================
+// Simulation Results (Phase 9)
+// ============================================
+
+export interface SimulationResultsTable {
+  id: string;
+  tenant_id: string;
+  run_id: string;
+  simulation_id: string;
+  total_revenue_baseline: number | null;
+  total_revenue_simulated: number | null;
+  total_revenue_delta: number | null;
+  total_revenue_delta_pct: number | null;
+  total_recognized_baseline: number | null;
+  total_recognized_simulated: number | null;
+  total_deferred_baseline: number | null;
+  total_deferred_simulated: number | null;
+  contracts_affected: number;
+  obligations_affected: number;
+  overrides_applied: number;
+  overrides_skipped: number;
+  summary_json: unknown;
+  warnings_json: unknown;
+  created_at: Generated<Date>;
+}
+
+export type SimulationResult = Selectable<SimulationResultsTable>;
+export type NewSimulationResult = Insertable<SimulationResultsTable>;
+
+// ============================================
+// Simulation Deltas (Phase 9)
+// ============================================
+
+export interface SimulationDeltasTable {
+  id: string;
+  tenant_id: string;
+  run_id: string;
+  simulation_id: string;
+  delta_type: 'revenue_total' | 'revenue_period' | 'recognized_shift' | 'deferred_shift' | 'contract_impact' | 'obligation_impact';
+  target_type: string | null;
+  target_id: string | null;
+  period_start: Date | null;
+  period_end: Date | null;
+  baseline_amount: number | null;
+  simulated_amount: number | null;
+  delta_amount: number;
+  delta_pct: number | null;
+  currency: string;
+  details_json: unknown | null;
+  created_at: Generated<Date>;
+}
+
+export type SimulationDelta = Selectable<SimulationDeltasTable>;
+export type NewSimulationDelta = Insertable<SimulationDeltasTable>;
+
+// ============================================
+// Simulation Audit (Phase 9)
+// ============================================
+
+export interface SimulationAuditTable {
+  id: string;
+  tenant_id: string;
+  simulation_id: string | null;
+  run_id: string | null;
+  action: 'created' | 'updated' | 'deleted' | 'override_added' | 'override_removed' | 'run_started' | 'run_completed' | 'run_failed' | 'template_applied';
+  actor_user_id: string | null;
+  details_json: unknown | null;
+  created_at: Generated<Date>;
+}
+
+export type SimulationAudit = Selectable<SimulationAuditTable>;
+export type NewSimulationAudit = Insertable<SimulationAuditTable>;
+
+// ============================================
+// Exports (Phase 10)
+// ============================================
+
+export interface ExportsTable {
+  id: string;
+  tenant_id: string;
+  snapshot_id: string;
+  export_type: 'issues_csv' | 'revrec_csv' | 'contracts_csv' | 'contracts_pdf' | 'audit_bundle_pdf' | 'executive_summary_pdf';
+  format: 'csv' | 'pdf' | 'xlsx';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  requested_by: string | null;
+  options_json: unknown;
+  error_code: string | null;
+  error_message: string | null;
+  processing_lock: Date | null;
+  created_at: Generated<Date>;
+  completed_at: Date | null;
+}
+
+export type Export = Selectable<ExportsTable>;
+export type NewExport = Insertable<ExportsTable>;
+export type ExportUpdate = Updateable<ExportsTable>;
+
+// ============================================
+// Export Files (Phase 10)
+// ============================================
+
+export interface ExportFilesTable {
+  id: string;
+  tenant_id: string;
+  export_id: string;
+  s3_key: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  checksum_sha256: string | null;
+  created_at: Generated<Date>;
+}
+
+export type ExportFile = Selectable<ExportFilesTable>;
+export type NewExportFile = Insertable<ExportFilesTable>;
+
+// ============================================
+// Export Items (Phase 10)
+// ============================================
+
+export interface ExportItemsTable {
+  id: string;
+  tenant_id: string;
+  export_id: string;
+  item_type: string;
+  item_id: string;
+  metadata_json: unknown;
+  created_at: Generated<Date>;
+}
+
+export type ExportItem = Selectable<ExportItemsTable>;
+export type NewExportItem = Insertable<ExportItemsTable>;
+
+// ============================================
+// Export Schedules (Phase 10)
+// ============================================
+
+export interface ExportSchedulesTable {
+  id: string;
+  tenant_id: string;
+  name: string;
+  export_type: 'issues_csv' | 'revrec_csv' | 'contracts_csv' | 'contracts_pdf' | 'audit_bundle_pdf' | 'executive_summary_pdf';
+  cadence: 'daily' | 'weekly' | 'monthly';
+  scope_json: unknown;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export type ExportSchedule = Selectable<ExportSchedulesTable>;
+export type NewExportSchedule = Insertable<ExportSchedulesTable>;
+export type ExportScheduleUpdate = Updateable<ExportSchedulesTable>;
+
+// ============================================
+// Export Runs (Phase 10)
+// ============================================
+
+export interface ExportRunsTable {
+  id: string;
+  tenant_id: string;
+  schedule_id: string;
+  export_id: string | null;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  started_at: Date | null;
+  finished_at: Date | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: Generated<Date>;
+}
+
+export type ExportRun = Selectable<ExportRunsTable>;
+export type NewExportRun = Insertable<ExportRunsTable>;
+export type ExportRunUpdate = Updateable<ExportRunsTable>;
+
+// ============================================
+// Export Audit (Phase 10)
+// ============================================
+
+export interface ExportAuditTable {
+  id: string;
+  tenant_id: string;
+  export_id: string;
+  action: 'requested' | 'started' | 'completed' | 'failed' | 'downloaded' | 'regenerated' | 'cancelled' | 'deleted';
+  actor_user_id: string | null;
+  details_json: unknown;
+  created_at: Generated<Date>;
+}
+
+export type ExportAudit = Selectable<ExportAuditTable>;
+export type NewExportAudit = Insertable<ExportAuditTable>;
+
+// ============================================
+// Digest Subscriptions (Phase 10)
+// ============================================
+
+export interface DigestSubscriptionsTable {
+  id: string;
+  tenant_id: string;
+  name: string;
+  cadence: 'daily' | 'weekly' | 'monthly';
+  scope_json: unknown;
+  recipients_json: unknown;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export type DigestSubscription = Selectable<DigestSubscriptionsTable>;
+export type NewDigestSubscription = Insertable<DigestSubscriptionsTable>;
+export type DigestSubscriptionUpdate = Updateable<DigestSubscriptionsTable>;
+
+// ============================================
+// Digest Runs (Phase 10)
+// ============================================
+
+export interface DigestRunsTable {
+  id: string;
+  tenant_id: string;
+  subscription_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  items_count: number;
+  recipients_count: number;
+  emails_sent: number;
+  emails_failed: number;
+  snapshot_id: string | null;
+  period_start: Date | null;
+  period_end: Date | null;
+  started_at: Date | null;
+  finished_at: Date | null;
+  error_code: string | null;
+  error_message: string | null;
+  content_json: unknown;
+  created_at: Generated<Date>;
+}
+
+export type DigestRun = Selectable<DigestRunsTable>;
+export type NewDigestRun = Insertable<DigestRunsTable>;
+export type DigestRunUpdate = Updateable<DigestRunsTable>;
+
+// ============================================
+// Dead Letter Jobs (Phase 11)
+// ============================================
+
+export interface DeadLetterJobsTable {
+  id: string;
+  tenant_id: string;
+  original_job_id: string;
+  queue_name: string;
+  job_type: string;
+  payload_json: unknown;
+  error_message: string | null;
+  error_stack: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  first_failed_at: Date;
+  last_failed_at: Date;
+  requeued_at: Date | null;
+  requeued_by: string | null;
+  discarded_at: Date | null;
+  discarded_by: string | null;
+  status: 'failed' | 'requeued' | 'discarded';
+  created_at: Generated<Date>;
+}
+
+export type DeadLetterJob = Selectable<DeadLetterJobsTable>;
+export type NewDeadLetterJob = Insertable<DeadLetterJobsTable>;
+export type DeadLetterJobUpdate = Updateable<DeadLetterJobsTable>;
+
+// ============================================
+// Integrity Check Runs (Phase 11)
+// ============================================
+
+export interface IntegrityCheckRunsTable {
+  id: string;
+  tenant_id: string;
+  snapshot_id: string | null;
+  check_type: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  issues_found: number;
+  details_json: unknown;
+  started_at: Date | null;
+  finished_at: Date | null;
+  created_at: Generated<Date>;
+}
+
+export type IntegrityCheckRun = Selectable<IntegrityCheckRunsTable>;
+export type NewIntegrityCheckRun = Insertable<IntegrityCheckRunsTable>;
+export type IntegrityCheckRunUpdate = Updateable<IntegrityCheckRunsTable>;
+
+// ============================================
+// Replay Audit (Phase 11)
+// ============================================
+
+export interface ReplayAuditTable {
+  id: string;
+  tenant_id: string;
+  replay_type: 'snapshot' | 'detection' | 'evidence' | 'backfill';
+  target_id: string;
+  source_description: string | null;
+  initiated_by: string | null;
+  job_id: string | null;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  result_json: unknown;
+  started_at: Date | null;
+  finished_at: Date | null;
+  created_at: Generated<Date>;
+}
+
+export type ReplayAudit = Selectable<ReplayAuditTable>;
+export type NewReplayAudit = Insertable<ReplayAuditTable>;
+export type ReplayAuditUpdate = Updateable<ReplayAuditTable>;
+
+// ============================================
 // Database Schema
 // ============================================
 
@@ -1365,5 +1921,33 @@ export interface Database {
   issue_sources: IssueSourcesTable;
   detection_configs: DetectionConfigsTable;
   fx_rates: FxRatesTable;
+  // Phase 8 tables
+  issue_evidence: IssueEvidenceTable;
+  issue_evidence_sources: IssueEvidenceSourcesTable;
+  issue_evidence_calculations: IssueEvidenceCalculationsTable;
+  issue_evidence_clauses: IssueEvidenceClausesTable;
+  issue_evidence_audit: IssueEvidenceAuditTable;
+  evidence_generation_runs: EvidenceGenerationRunsTable;
+  // Phase 9 tables
+  simulation_templates: SimulationTemplatesTable;
+  simulations: SimulationsTable;
+  simulation_overrides: SimulationOverridesTable;
+  simulation_runs: SimulationRunsTable;
+  simulation_results: SimulationResultsTable;
+  simulation_deltas: SimulationDeltasTable;
+  simulation_audit: SimulationAuditTable;
+  // Phase 10 tables
+  exports: ExportsTable;
+  export_files: ExportFilesTable;
+  export_items: ExportItemsTable;
+  export_schedules: ExportSchedulesTable;
+  export_runs: ExportRunsTable;
+  export_audit: ExportAuditTable;
+  digest_subscriptions: DigestSubscriptionsTable;
+  digest_runs: DigestRunsTable;
+  // Phase 11 tables
+  dead_letter_jobs: DeadLetterJobsTable;
+  integrity_check_runs: IntegrityCheckRunsTable;
+  replay_audit: ReplayAuditTable;
 }
 
