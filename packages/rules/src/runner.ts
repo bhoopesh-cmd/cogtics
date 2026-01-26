@@ -162,6 +162,7 @@ export async function runDetection(
           issuesByCategory: countByCategory(allIssues),
           ruleResults,
           durationMs: Date.now() - startTime,
+          issues: allIssues,
           errorCode: 'RULE_ERROR',
           errorMessage: `Rule ${rule.id} failed: ${errorMessage}`,
         };
@@ -186,6 +187,7 @@ export async function runDetection(
     issuesByCategory: countByCategory(scoredIssues),
     ruleResults,
     durationMs: Date.now() - startTime,
+    issues: scoredIssues,
   };
 }
 

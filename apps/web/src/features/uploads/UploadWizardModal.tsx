@@ -10,10 +10,14 @@ import {
   ArrowLeft,
   Loader2,
   AlertCircle,
+  Sparkles,
+  ChevronDown,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { useMutation } from '@tanstack/react-query';
-import { startCsvUpload, completeCsvUpload, startPdfUpload, completePdfUpload, deleteUpload } from '@/lib/api/endpoints';
+import { startCsvUpload, completeCsvUpload, startPdfUpload, completePdfUpload, deleteUpload, analyzeCSVUpload, CSVAnalysisResult, FieldCategory } from '@/lib/api/endpoints';
 
 interface UploadWizardModalProps {
   isOpen: boolean;
@@ -28,10 +32,163 @@ type UploadType = 'csv' | 'pdf';
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_FILES = 10;
 
+// Extended column mapping with category info (internal use only)
 interface ColumnMapping {
   sourceColumn: string;
   targetField: string;
-  required: boolean;
+  category: FieldCategory;
+  metadataKey?: string;
+  confidence?: number;
+}
+
+// Required fields per entity type (must be mapped before upload)
+const REQUIRED_FIELDS: Record<string, { field: string; label: string }[]> = {
+  customer: [
+    { field: 'external_id', label: 'Unique ID' },
+    { field: 'name', label: 'Name' },
+  ],
+  invoice: [
+    { field: 'external_id', label: 'Unique ID' },
+    { field: 'customer_id', label: 'Customer ID' },
+    { field: 'invoice_date', label: 'Invoice Date' },
+    { field: 'amount', label: 'Amount' },
+  ],
+  contract: [
+    { field: 'external_id', label: 'Unique ID' },
+    { field: 'customer_id', label: 'Customer ID' },
+    { field: 'start_date', label: 'Start Date' },
+    { field: 'total_value', label: 'Total Value' },
+  ],
+  payment: [
+    { field: 'external_id', label: 'Unique ID' },
+    { field: 'amount', label: 'Amount' },
+    { field: 'payment_date', label: 'Payment Date' },
+  ],
+  product: [
+    { field: 'external_id', label: 'Unique ID' },
+    { field: 'name', label: 'Name' },
+  ],
+  subscription: [
+    { field: 'external_id', label: 'Unique ID' },
+    { field: 'customer_id', label: 'Customer ID' },
+    { field: 'start_date', label: 'Start Date' },
+    { field: 'mrr', label: 'Monthly Revenue (MRR)' },
+  ],
+  usage: [
+    { field: 'external_id', label: 'Unique ID' },
+    { field: 'customer_id', label: 'Customer ID' },
+    { field: 'quantity', label: 'Quantity' },
+    { field: 'timestamp', label: 'Timestamp' },
+  ],
+  credit_memo: [
+    { field: 'external_id', label: 'Unique ID' },
+    { field: 'customer_id', label: 'Customer ID' },
+    { field: 'amount', label: 'Amount' },
+  ],
+  unknown: [
+    { field: 'external_id', label: 'Unique ID' },
+  ],
+};
+
+// Grouped field options for the dropdown (user-friendly labels)
+const FIELD_OPTIONS = [
+  {
+    label: 'Identity',
+    options: [
+      { value: 'external_id', label: 'Unique ID' },
+      { value: 'name', label: 'Name' },
+      { value: 'customer_id', label: 'Customer ID' },
+    ],
+  },
+  {
+    label: 'Contact',
+    options: [
+      { value: 'email', label: 'Email' },
+      { value: 'phone', label: 'Phone' },
+      { value: 'billing_address', label: 'Billing Address' },
+    ],
+  },
+  {
+    label: 'Financial',
+    options: [
+      { value: 'amount', label: 'Amount' },
+      { value: 'total_value', label: 'Total Value' },
+      { value: 'mrr', label: 'Monthly Revenue (MRR)' },
+      { value: 'currency', label: 'Currency' },
+      { value: 'tax_amount', label: 'Tax Amount' },
+      { value: 'discount_amount', label: 'Discount Amount' },
+    ],
+  },
+  {
+    label: 'Dates',
+    options: [
+      { value: 'invoice_date', label: 'Invoice Date' },
+      { value: 'due_date', label: 'Due Date' },
+      { value: 'start_date', label: 'Start Date' },
+      { value: 'end_date', label: 'End Date' },
+      { value: 'payment_date', label: 'Payment Date' },
+      { value: 'created_at', label: 'Created Date' },
+    ],
+  },
+  {
+    label: 'Reference',
+    options: [
+      { value: 'invoice_id', label: 'Invoice ID' },
+      { value: 'invoice_number', label: 'Invoice Number' },
+      { value: 'contract_id', label: 'Contract ID' },
+      { value: 'tax_id', label: 'Tax ID' },
+      { value: 'status', label: 'Status' },
+    ],
+  },
+  {
+    label: 'Usage & Metrics',
+    options: [
+      { value: 'quantity', label: 'Quantity' },
+      { value: 'timestamp', label: 'Timestamp' },
+      { value: 'metric_name', label: 'Metric Name' },
+      { value: 'unit', label: 'Unit' },
+    ],
+  },
+  {
+    label: 'Other',
+    options: [
+      { value: 'auto_renew', label: 'Auto Renew' },
+      { value: 'billing_frequency', label: 'Billing Frequency' },
+      { value: 'payment_method', label: 'Payment Method' },
+      { value: 'reference', label: 'Reference' },
+    ],
+  },
+];
+
+// Custom Select component matching the app theme
+function Select({ 
+  value, 
+  onChange, 
+  children,
+  className = '',
+}: { 
+  value: string; 
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full appearance-none px-3 py-2 pr-8 bg-black border border-zinc-700 rounded-lg text-sm text-white 
+                   focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30
+                   hover:border-zinc-600 transition-colors cursor-pointer"
+      >
+        {children}
+      </select>
+      <ChevronDown 
+        size={16} 
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" 
+      />
+    </div>
+  );
 }
 
 export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardModalProps) {
@@ -45,6 +202,11 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
   const [error, setError] = useState<string | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
+  
+  // AI analysis state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<CSVAnalysisResult | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   // Track uploading state
   const [isUploading, setIsUploading] = useState(false);
@@ -63,6 +225,8 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
             columns: columnMappings.map(m => ({
               sourceColumn: m.sourceColumn,
               targetField: m.targetField,
+              category: m.category,
+              metadataKey: m.metadataKey,
             })),
             skipHeaderRow: true,
             delimiter: ',',
@@ -101,6 +265,94 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
     setCsvHeaders([]);
     setColumnMappings([]);
     setIsUploading(false);
+    setIsAnalyzing(false);
+    setAiAnalysis(null);
+    setAiError(null);
+  };
+
+  // Parse CSV content to get headers and sample rows
+  const parseCSVContent = (text: string): { headers: string[]; sampleRows: string[][] } => {
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    if (lines.length === 0) return { headers: [], sampleRows: [] };
+    
+    const parseLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const nextChar = line[i + 1];
+        
+        if (char === '"') {
+          if (inQuotes && nextChar === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+    
+    const headers = parseLine(lines[0]);
+    const sampleRows: string[][] = [];
+    for (let i = 1; i < Math.min(lines.length, 6); i++) {
+      sampleRows.push(parseLine(lines[i]));
+    }
+    
+    return { headers, sampleRows };
+  };
+
+  // Run AI analysis on CSV
+  const runAIAnalysis = async (headers: string[], sampleRows: string[][], fileName: string) => {
+    setIsAnalyzing(true);
+    setAiError(null);
+    
+    try {
+      const res = await analyzeCSVUpload({
+        headers,
+        sampleRows,
+        fileName,
+      });
+      
+      if (!res.ok) {
+        setAiError(res.error || 'AI analysis failed');
+        return;
+      }
+      
+      const analysis = res.data;
+      setAiAnalysis(analysis);
+      
+      // Auto-set entity type from AI suggestion
+      if (analysis.entityType && analysis.entityTypeConfidence > 0.5) {
+        setEntityType(analysis.entityType);
+      }
+      
+      // Set ALL column mappings from AI - every column is mapped
+      if (analysis.columnMappings && analysis.columnMappings.length > 0) {
+        const mappings: ColumnMapping[] = analysis.columnMappings.map(m => ({
+          sourceColumn: m.sourceColumn,
+          targetField: m.targetField,
+          category: m.category || 'metadata',
+          metadataKey: m.metadataKey,
+          confidence: m.confidence,
+        }));
+        setColumnMappings(mappings);
+      }
+    } catch (err) {
+      console.error('AI analysis error:', err);
+      setAiError(err instanceof Error ? err.message : 'AI analysis failed');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -108,45 +360,28 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
 
     setFiles(acceptedFiles);
     setError(null);
+    setAiAnalysis(null);
+    setAiError(null);
     
     // Initialize progress for all files
     const initialProgress: Record<string, number> = {};
     acceptedFiles.forEach(f => { initialProgress[f.name] = 0; });
     setUploadProgress(initialProgress);
 
-    // Parse CSV headers from the first CSV file
+    // Parse CSV headers and sample data from the first CSV file
     if (uploadType === 'csv') {
       const firstCsv = acceptedFiles.find(f => f.name.endsWith('.csv'));
       if (firstCsv) {
-        const text = await firstCsv.slice(0, 4096).text();
-        const firstLine = text.split('\n')[0];
-        const headers = firstLine.split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        setCsvHeaders(headers);
+        // Read more content for AI analysis (first 8KB)
+        const text = await firstCsv.slice(0, 8192).text();
+        const { headers, sampleRows } = parseCSVContent(text);
         
-        // Auto-map obvious columns
-        const autoMappings: ColumnMapping[] = [];
-        const targetFields = [
-          { patterns: ['id', 'external_id', 'customer_id'], field: 'external_id', required: true },
-          { patterns: ['name', 'company', 'company_name'], field: 'name', required: true },
-          { patterns: ['email', 'e-mail'], field: 'email', required: false },
-          { patterns: ['phone', 'telephone'], field: 'phone', required: false },
-          { patterns: ['address', 'billing_address'], field: 'billing_address', required: false },
-        ];
-
-        for (const header of headers) {
-          const lower = header.toLowerCase();
-          for (const target of targetFields) {
-            if (target.patterns.some(p => lower.includes(p))) {
-              autoMappings.push({
-                sourceColumn: header,
-                targetField: target.field,
-                required: target.required,
-              });
-              break;
-            }
-          }
+        if (headers.length > 0) {
+          setCsvHeaders(headers);
+          
+          // Run AI analysis in background
+          runAIAnalysis(headers, sampleRows, firstCsv.name);
         }
-        setColumnMappings(autoMappings);
       }
     }
   }, [uploadType]);
@@ -415,18 +650,17 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
 
                 {uploadType === 'csv' && (
                   <div className="mt-4">
-                    <label className="block text-sm text-zinc-400 mb-2">Entity Type</label>
-                    <select
-                      value={entityType}
-                      onChange={(e) => setEntityType(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:border-accent focus:outline-none"
-                    >
+                    <label className="block text-sm text-zinc-400 mb-2">What type of data is this?</label>
+                    <Select value={entityType} onChange={setEntityType}>
                       <option value="customer">Customers</option>
                       <option value="invoice">Invoices</option>
                       <option value="contract">Contracts</option>
                       <option value="payment">Payments</option>
                       <option value="product">Products</option>
-                    </select>
+                      <option value="subscription">Subscriptions</option>
+                      <option value="usage">Usage Data</option>
+                    </Select>
+                    <p className="text-xs text-zinc-500 mt-1.5">Don't worry, we'll auto-detect this from your file</p>
                   </div>
                 )}
               </motion.div>
@@ -525,44 +759,192 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-4"
               >
-                <p className="text-zinc-400">Map your CSV columns to the target fields:</p>
+                {/* Header with data type selector */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-zinc-300 font-medium">Review column mappings</p>
+                    <p className="text-zinc-500 text-sm">We've matched your columns. Adjust any that need changing.</p>
+                  </div>
+                  <Select value={entityType} onChange={setEntityType} className="w-36">
+                    <option value="customer">Customers</option>
+                    <option value="invoice">Invoices</option>
+                    <option value="contract">Contracts</option>
+                    <option value="payment">Payments</option>
+                    <option value="product">Products</option>
+                    <option value="subscription">Subscriptions</option>
+                    <option value="usage">Usage Data</option>
+                  </Select>
+                </div>
 
-                {csvHeaders.length > 0 ? (
-                  <div className="space-y-3">
-                    {csvHeaders.map((header) => {
-                      const mapping = columnMappings.find(m => m.sourceColumn === header);
+                {/* Loading state */}
+                {isAnalyzing && (
+                  <div className="flex items-center justify-center py-6 text-zinc-400">
+                    <Loader2 size={20} className="animate-spin mr-2" />
+                    Analyzing your file...
+                  </div>
+                )}
+
+                {aiError && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                    <AlertCircle size={14} className="text-zinc-400 flex-shrink-0" />
+                    <span className="text-zinc-400 text-sm">Auto-detection unavailable. Please map columns manually.</span>
+                  </div>
+                )}
+
+                {/* Required fields checklist */}
+                {(() => {
+                  const required = REQUIRED_FIELDS[entityType] || REQUIRED_FIELDS.unknown;
+                  const mappedFields = columnMappings.map(m => m.targetField);
+                  const missingRequired = required.filter(r => !mappedFields.includes(r.field));
+                  const hasAllRequired = missingRequired.length === 0;
+                  
+                  return (
+                    <div className={`p-3 rounded-lg border ${
+                      hasAllRequired 
+                        ? 'bg-green-500/10 border-green-500/20' 
+                        : 'bg-amber-500/10 border-amber-500/20'
+                    }`}>
+                      <p className={`text-sm font-medium mb-2 ${hasAllRequired ? 'text-green-400' : 'text-amber-300'}`}>
+                        {hasAllRequired ? (
+                          <>
+                            <CheckCircle2 size={14} className="inline mr-1.5 -mt-0.5" />
+                            All required fields mapped
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle size={14} className="inline mr-1.5 -mt-0.5" />
+                            Map these required fields to continue:
+                          </>
+                        )}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {required.map(({ field, label }) => {
+                          const isMapped = mappedFields.includes(field);
+                          return (
+                            <span 
+                              key={field}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                                isMapped 
+                                  ? 'bg-green-500/20 text-green-300' 
+                                  : 'bg-red-500/20 text-red-300'
+                              }`}
+                            >
+                              {isMapped ? (
+                                <Check size={12} />
+                              ) : (
+                                <X size={12} />
+                              )}
+                              {label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Column mappings - simplified UI */}
+                {columnMappings.length > 0 ? (
+                  <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                    {columnMappings.map((mapping) => {
+                      const isMatched = mapping.targetField !== 'metadata_json';
+                      // Get all target fields currently in use (except metadata_json and current mapping)
+                      const usedTargets = columnMappings
+                        .filter(m => m.sourceColumn !== mapping.sourceColumn && m.targetField !== 'metadata_json')
+                        .map(m => m.targetField);
+                      
                       return (
-                        <div key={header} className="flex items-center gap-3">
-                          <span className="w-1/3 text-white truncate">{header}</span>
-                          <ArrowRight size={14} className="text-zinc-600" />
-                          <select
-                            value={mapping?.targetField ?? ''}
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                setColumnMappings(prev => [
-                                  ...prev.filter(m => m.sourceColumn !== header),
-                                  { sourceColumn: header, targetField: e.target.value, required: false },
-                                ]);
-                              } else {
-                                setColumnMappings(prev => prev.filter(m => m.sourceColumn !== header));
-                              }
+                        <div 
+                          key={mapping.sourceColumn} 
+                          className={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors ${
+                            isMatched 
+                              ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700' 
+                              : 'bg-zinc-900/30 border-zinc-800/50 hover:border-zinc-700'
+                          }`}
+                        >
+                          {/* Status indicator */}
+                          {isMatched ? (
+                            <CheckCircle2 size={16} className="text-green-500 flex-shrink-0" />
+                          ) : (
+                            <Circle size={16} className="text-zinc-600 flex-shrink-0" />
+                          )}
+                          
+                          {/* Source column name */}
+                          <span className="w-1/3 text-white truncate text-sm font-medium" title={mapping.sourceColumn}>
+                            {mapping.sourceColumn}
+                          </span>
+                          
+                          <ArrowRight size={14} className="text-zinc-600 flex-shrink-0" />
+                          
+                          {/* Target field selector */}
+                          <Select
+                            value={mapping.targetField}
+                            onChange={(newTarget) => {
+                              const isMetadata = newTarget === 'metadata_json';
+                              setColumnMappings(prev => prev.map(m => 
+                                m.sourceColumn === mapping.sourceColumn 
+                                  ? { 
+                                      ...m, 
+                                      targetField: newTarget,
+                                      category: isMetadata ? 'metadata' : (m.category === 'metadata' ? 'standard' : m.category),
+                                      metadataKey: isMetadata ? mapping.sourceColumn.toLowerCase().replace(/[^a-z0-9]/g, '_') : undefined,
+                                    }
+                                  : m
+                              ));
                             }}
-                            className="flex-1 px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:border-accent focus:outline-none text-sm"
+                            className="flex-1"
                           >
-                            <option value="">-- Skip --</option>
-                            <option value="external_id">External ID</option>
-                            <option value="name">Name</option>
-                            <option value="email">Email</option>
-                            <option value="phone">Phone</option>
-                            <option value="billing_address">Billing Address</option>
-                            <option value="tax_id">Tax ID</option>
-                          </select>
+                            <option value="metadata_json">Keep as extra data</option>
+                            <option disabled>──────────</option>
+                            {FIELD_OPTIONS.map((group) => (
+                              <optgroup key={group.label} label={group.label}>
+                                {group.options.map((opt) => {
+                                  const isUsed = usedTargets.includes(opt.value);
+                                  return (
+                                    <option 
+                                      key={opt.value} 
+                                      value={opt.value}
+                                      disabled={isUsed}
+                                    >
+                                      {opt.label}{isUsed ? ' (already mapped)' : ''}
+                                    </option>
+                                  );
+                                })}
+                              </optgroup>
+                            ))}
+                          </Select>
                         </div>
                       );
                     })}
                   </div>
+                ) : csvHeaders.length > 0 ? (
+                  <div className="flex items-center justify-center py-8 text-zinc-500">
+                    <Loader2 size={20} className="animate-spin mr-2" />
+                    Analyzing your file...
+                  </div>
                 ) : (
-                  <p className="text-zinc-500">No headers detected. Proceeding with default mapping.</p>
+                  <p className="text-zinc-500 text-center py-4">No column headers detected.</p>
+                )}
+
+                {/* Summary - what will happen */}
+                {columnMappings.length > 0 && (
+                  <div className="mt-3 p-3 rounded-lg bg-zinc-800/30 border border-zinc-800">
+                    <p className="text-xs text-zinc-400">
+                      <span className="text-green-400 font-medium">
+                        {columnMappings.filter(m => m.targetField !== 'metadata_json').length} columns
+                      </span>
+                      {' '}will be imported as standard fields.
+                      {columnMappings.filter(m => m.targetField === 'metadata_json').length > 0 && (
+                        <>
+                          {' '}
+                          <span className="text-zinc-300">
+                            {columnMappings.filter(m => m.targetField === 'metadata_json').length} columns
+                          </span>
+                          {' '}will be kept as extra data for reference.
+                        </>
+                      )}
+                    </p>
+                  </div>
                 )}
               </motion.div>
             )}
@@ -576,6 +958,14 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
                 className="space-y-4"
               >
                 <p className="text-zinc-400">Review your upload settings:</p>
+
+                {/* AI Badge */}
+                {aiAnalysis?.aiPowered && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-accent/10 border border-accent/20">
+                    <Sparkles size={16} className="text-accent" />
+                    <span className="text-accent text-sm">Configuration auto-detected by AI</span>
+                  </div>
+                )}
 
                 <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between">
@@ -592,14 +982,31 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
                   </div>
                   {uploadType === 'csv' && (
                     <>
-                      <div className="flex justify-between">
-                        <span className="text-zinc-500">Entity Type</span>
-                        <span className="text-white capitalize">{entityType}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-500">Data Type</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-white capitalize">{entityType}</span>
+                          {aiAnalysis && aiAnalysis.entityType === entityType && (
+                            <span className="text-xs text-green-400 flex items-center gap-1">
+                              <Sparkles size={10} /> Auto-detected
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-zinc-500">Mapped Columns</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-500">Columns Found</span>
                         <span className="text-white">{columnMappings.length}</span>
                       </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-500">Matched Fields</span>
+                        <span className="text-green-400">{columnMappings.filter(m => m.targetField !== 'metadata_json').length}</span>
+                      </div>
+                      {columnMappings.filter(m => m.targetField === 'metadata_json').length > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-zinc-500">Extra Data</span>
+                          <span className="text-zinc-400">{columnMappings.filter(m => m.targetField === 'metadata_json').length} columns</span>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -671,15 +1078,27 @@ export function UploadWizardModal({ isOpen, onClose, onComplete }: UploadWizardM
             </button>
           )}
 
-          {step === 'configure-mapping' && (
-            <button
-              onClick={() => setStep('review')}
-              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg transition-colors"
-            >
-              Next
-              <ArrowRight size={16} />
-            </button>
-          )}
+          {step === 'configure-mapping' && (() => {
+            const required = REQUIRED_FIELDS[entityType] || REQUIRED_FIELDS.unknown;
+            const mappedFields = columnMappings.map(m => m.targetField);
+            const hasAllRequired = required.every(r => mappedFields.includes(r.field));
+            
+            return (
+              <button
+                onClick={() => setStep('review')}
+                disabled={!hasAllRequired}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  hasAllRequired
+                    ? 'bg-accent hover:bg-accent/90 text-white'
+                    : 'bg-zinc-700 text-zinc-400 cursor-not-allowed'
+                }`}
+                title={hasAllRequired ? undefined : 'Map all required fields to continue'}
+              >
+                Next
+                <ArrowRight size={16} />
+              </button>
+            );
+          })()}
 
           {step === 'review' && (
             <button

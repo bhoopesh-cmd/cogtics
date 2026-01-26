@@ -7,3 +7,4 @@
 export * from './client.js';
 export * from './prompts.js';
 export * from './document-extraction.js';
+export * from './csv-analyzer.js';

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -18,22 +18,23 @@ import {
   Users,
   GitMerge,
   Upload,
-  FileSearch,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/useAuth';
 import Logo from '@/components/ui/Logo';
+import { getIssueSummary } from '@/lib/api/endpoints';
 
+// Nav items without dynamic badges (those are handled separately)
 const navItems = [
-  { path: '/', label: 'Executive Summary', icon: LayoutDashboard, badge: null },
-  { path: '/data', label: 'Data Explorer', icon: Database, badge: null },
-  { path: '/uploads', label: 'Manual Uploads', icon: Upload, badge: null },
-  { path: '/identity/queue', label: 'Identity Queue', icon: GitMerge, badge: null },
-  { path: '/identity/resolved', label: 'Resolved Customers', icon: Users, badge: null },
-  { path: '/issues', label: 'Issues & Risk', icon: AlertCircle, badge: '3' },
-  { path: '/contracts', label: 'Contracts', icon: FileText, badge: null },
-  { path: '/revrec', label: 'Revenue Rec', icon: BarChart3, badge: null },
-  { path: '/simulations', label: 'Simulations', icon: Sliders, badge: null },
-  { path: '/exports', label: 'Exports & Audit', icon: Download, badge: null },
+  { path: '/', label: 'Executive Summary', icon: LayoutDashboard, badgeKey: null },
+  { path: '/data', label: 'Data Explorer', icon: Database, badgeKey: null },
+  { path: '/uploads', label: 'Manual Uploads', icon: Upload, badgeKey: null },
+  { path: '/identity/queue', label: 'Identity Queue', icon: GitMerge, badgeKey: null },
+  { path: '/identity/resolved', label: 'Resolved Customers', icon: Users, badgeKey: null },
+  { path: '/issues', label: 'Issues & Risk', icon: AlertCircle, badgeKey: 'openIssues' },
+  { path: '/contracts', label: 'Contracts', icon: FileText, badgeKey: null },
+  { path: '/revrec', label: 'Revenue Rec', icon: BarChart3, badgeKey: null },
+  { path: '/simulations', label: 'Simulations', icon: Sliders, badgeKey: null },
+  { path: '/exports', label: 'Exports & Audit', icon: Download, badgeKey: null },
 ];
 
 const settingsItems = [
@@ -46,6 +47,31 @@ const settingsItems = [
 export function Sidebar() {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const [badges, setBadges] = useState<Record<string, string | null>>({});
+
+  // Fetch dynamic badge counts
+  useEffect(() => {
+    const fetchBadges = async () => {
+      try {
+        const summary = await getIssueSummary();
+        // Count open issues (not resolved, not dismissed)
+        const openCount = (summary.byStatus?.['open'] ?? 0) + 
+                         (summary.byStatus?.['investigating'] ?? 0) + 
+                         (summary.byStatus?.['confirmed'] ?? 0);
+        setBadges({
+          openIssues: openCount > 0 ? String(openCount) : null,
+        });
+      } catch (err) {
+        // Silently fail - badge will just not show
+        console.debug('Failed to fetch issue count:', err);
+      }
+    };
+
+    fetchBadges();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchBadges, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="w-64 h-screen bg-black border-r border-zinc-900 flex flex-col fixed left-0 top-0 z-50">
@@ -82,9 +108,9 @@ export function Sidebar() {
               )}
               <Icon size={18} className={isActive ? 'text-accent' : 'group-hover:text-zinc-400'} />
               {item.label}
-              {item.badge && (
+              {item.badgeKey && badges[item.badgeKey] && (
                 <span className="ml-auto text-[10px] bg-[#ff6500]/20 text-[#ff6500] px-2 py-0.5 rounded-full">
-                  {item.badge}
+                  {badges[item.badgeKey]}
                 </span>
               )}
             </NavLink>

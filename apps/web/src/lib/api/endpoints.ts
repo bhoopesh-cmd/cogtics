@@ -949,6 +949,42 @@ export async function completeCsvUpload(uploadId: string, mapping?: Record<strin
   );
 }
 
+// AI-powered CSV analysis - maps ALL columns
+export type FieldCategory = 'required' | 'standard' | 'metadata';
+
+export interface ColumnMapping {
+  sourceColumn: string;
+  targetField: string;        // Canonical field name OR 'metadata_json'
+  category: FieldCategory;    // 'required' | 'standard' | 'metadata'
+  metadataKey?: string;       // Key name if storing in metadata_json
+  confidence: number;
+  reasoning: string;
+}
+
+export interface CSVAnalysisResult {
+  entityType: string;
+  entityTypeConfidence: number;
+  entityTypeReasoning: string;
+  columnMappings: ColumnMapping[];  // ALL columns mapped
+  requiredMissing: string[];        // Required fields not found
+  suggestions: string[];
+  warnings: string[];
+  aiPowered: boolean;
+}
+
+export async function analyzeCSVUpload(params: {
+  headers: string[];
+  sampleRows: string[][];
+  fileName?: string;
+  userHint?: string;
+}) {
+  return apiClient.post<CSVAnalysisResult>(
+    '/uploads/analyze',
+    params,
+    getToken()
+  );
+}
+
 export async function startPdfUpload(params: {
   fileName: string;
   contentType: string;

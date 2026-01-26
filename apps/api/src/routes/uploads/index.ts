@@ -658,6 +658,77 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // ============================================
+  // POST /uploads/analyze - AI-powered CSV analysis
+  // ============================================
+  fastify.post('/analyze', {
+    handler: async (request, reply) => {
+      const body = request.body as {
+        headers: string[];
+        sampleRows: string[][];
+        fileName?: string;
+        userHint?: string;
+      };
+
+      if (!body.headers || !Array.isArray(body.headers) || body.headers.length === 0) {
+        throw fastify.httpErrors.badRequest('headers array is required');
+      }
+
+      // Dynamically import the analyzer to avoid bundling issues
+      let analyzeCSV: typeof import('@cogtics/utils').llm.analyzeCSV;
+      try {
+        const utils = await import('@cogtics/utils');
+        analyzeCSV = utils.llm.analyzeCSV;
+      } catch (err) {
+        console.error('Failed to import analyzeCSV:', err);
+        // Fall back to basic analysis if module not available
+        return reply.send({
+          entityType: 'customer',
+          entityTypeConfidence: 0.3,
+          entityTypeReasoning: 'Default fallback - analyzer not available',
+          columnMappings: body.headers.map((h: string) => ({
+            sourceColumn: h,
+            targetField: null,
+            confidence: 0.1,
+            reasoning: 'Manual configuration required',
+          })),
+          suggestions: ['Please configure column mappings manually'],
+          warnings: ['AI analysis is not available'],
+          aiPowered: false,
+        });
+      }
+
+      if (typeof analyzeCSV !== 'function') {
+        console.error('analyzeCSV is not a function, got:', typeof analyzeCSV);
+        return reply.send({
+          entityType: 'customer',
+          entityTypeConfidence: 0.3,
+          entityTypeReasoning: 'Analyzer function not available',
+          columnMappings: body.headers.map((h: string) => ({
+            sourceColumn: h,
+            targetField: null,
+            confidence: 0.1,
+            reasoning: 'Manual configuration required',
+          })),
+          suggestions: ['Please configure column mappings manually'],
+          warnings: ['AI analysis module error'],
+          aiPowered: false,
+        });
+      }
+
+      const result = await analyzeCSV(
+        body.headers,
+        body.sampleRows || [],
+        {
+          fileName: body.fileName,
+          userHint: body.userHint,
+        }
+      );
+
+      return reply.send(result);
+    },
+  });
+
+  // ============================================
   // GET /uploads/templates - Get CSV template definitions
   // ============================================
   fastify.get('/templates', {

@@ -287,6 +287,8 @@ export interface DetectionRunResult {
   issuesByCategory: Record<string, number>;
   ruleResults: RuleRunResult[];
   durationMs: number;
+  /** All detected issues (after deduplication and scoring) */
+  issues: RuleIssue[];
   errorCode?: string;
   errorMessage?: string;
 }

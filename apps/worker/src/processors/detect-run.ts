@@ -5,14 +5,25 @@
  */
 import type { Logger } from 'pino';
 import type { Kysely } from 'kysely';
-import type { Database } from '@cogtics/db';
-import type { DetectRunJobPayload } from '@cogtics/schemas';
+import type { Database, Snapshot } from '@cogtics/db';
+import type { DetectRunJobPayload, DetectionConfig } from '@cogtics/schemas';
 import {
   generateDetectionRunId,
   generateIssueId,
   generateIssueSourceId,
   DetectionConfigSchema,
 } from '@cogtics/schemas';
+import {
+  initializeRules,
+  runDetection,
+  DEFAULT_DETECTION_CONFIG,
+  type RuleContext,
+  type DataQualityReport,
+  type ContractWithTerms,
+  type InvoiceWithLines,
+  type ScheduleWithObligation,
+  type RuleIssue,
+} from '@cogtics/rules';
 
 interface JobResult {
   success: boolean;
@@ -21,8 +32,8 @@ interface JobResult {
   processingTimeMs?: number;
 }
 
-// Placeholder for rules import - will be added when package is linked
-// import * as rules from '@cogtics/rules';
+// Initialize rules registry at module load
+initializeRules();
 
 /**
  * Process detection run job.
@@ -59,22 +70,51 @@ export async function processDetectRunJob(
     }, 'Loaded snapshot data');
 
     // 3. Parse config
-    const detectionConfig = config 
+    const detectionConfig: DetectionConfig = config 
       ? DetectionConfigSchema.parse(config)
-      : DetectionConfigSchema.parse({});
+      : { ...DEFAULT_DETECTION_CONFIG };
 
-    // 4. Run detection (placeholder - actual implementation when rules package is linked)
-    // In production, this would be:
-    // const result = await rules.runDetection(context, {});
-    
-    // For now, create a mock result
-    const mockIssues: any[] = [];
-    const issuesBySeverity: Record<string, number> = { low: 0, medium: 0, high: 0, critical: 0, info: 0 };
-    const issuesByCategory: Record<string, number> = {};
+    // 4. Build data quality report
+    const dataQuality = buildDataQualityReport(data, detectionConfig);
 
-    // 5. Persist issues
-    for (const issue of mockIssues) {
+    // 5. Build rule context
+    const context: RuleContext = {
+      tenantId,
+      snapshotId,
+      snapshotDate: data.snapshot.created_at,
+      runId,
+      config: detectionConfig,
+      dataQuality,
+      contracts: data.contracts,
+      invoices: data.invoices,
+      payments: data.payments,
+      usageEvents: data.usageEvents,
+      customers: data.customers,
+      products: data.products,
+      schedules: data.schedules,
+      obligations: data.obligations,
+      fxRates: data.fxRates,
+      priorIssues: data.priorIssues,
+      currentRunIssues: [],
+    };
+
+    // 6. Run detection rules
+    logger.info({ rulesConfig: Object.keys(detectionConfig) }, 'Running detection rules');
+    const result = await runDetection(context, {});
+
+    logger.info({
+      issuesTotal: result.issuesTotal,
+      issuesBySeverity: result.issuesBySeverity,
+      issuesByCategory: result.issuesByCategory,
+      ruleResults: result.ruleResults.length,
+      durationMs: result.durationMs,
+    }, 'Detection rules completed');
+
+    // 7. Persist issues
+    for (const issue of result.issues) {
       const issueId = generateIssueId();
+      // issueKey is added dynamically by the runner
+      const issueKey = (issue as RuleIssue & { issueKey?: string }).issueKey;
       
       await db.insertInto('issues').values({
         id: issueId,
@@ -83,7 +123,7 @@ export async function processDetectRunJob(
         run_id: runId,
         rule_id: issue.ruleId,
         rule_version: issue.ruleVersion,
-        issue_key: issue.issueKey,
+        issue_key: issueKey,
         category: issue.category,
         status: 'open',
         severity: issue.severity,
@@ -117,38 +157,39 @@ export async function processDetectRunJob(
         }
       }
 
-      // Update counts
-      issuesBySeverity[issue.severity] = (issuesBySeverity[issue.severity] || 0) + 1;
-      issuesByCategory[issue.category] = (issuesByCategory[issue.category] || 0) + 1;
     }
 
-    // 6. Update detection run with results
+    // 8. Update detection run with results
     await db.updateTable('detection_runs')
       .set({
         status: 'completed',
         finished_at: new Date(),
-        issues_total: mockIssues.length,
-        issues_by_severity: issuesBySeverity,
-        issues_by_category: issuesByCategory,
+        issues_total: result.issuesTotal,
+        issues_by_severity: result.issuesBySeverity,
+        issues_by_category: result.issuesByCategory,
         stats_json: {
           durationMs: Date.now() - startTime,
           contractsAnalyzed: data.contracts.length,
           invoicesAnalyzed: data.invoices.length,
+          rulesExecuted: result.ruleResults.filter(r => !r.skipped).length,
+          rulesSkipped: result.ruleResults.filter(r => r.skipped).length,
+          rulesetVersion: result.rulesetVersion,
         },
       })
       .where('id', '=', runId)
       .execute();
 
-    logger.info({ runId, issueCount: mockIssues.length }, 'Detection run completed');
+    logger.info({ runId, issueCount: result.issuesTotal }, 'Detection run completed');
 
     return {
       success: true,
-      message: `Detection completed: ${mockIssues.length} issues found`,
+      message: `Detection completed: ${result.issuesTotal} issues found`,
       data: {
         runId,
-        issuesTotal: mockIssues.length,
-        issuesBySeverity,
-        issuesByCategory,
+        issuesTotal: result.issuesTotal,
+        issuesBySeverity: result.issuesBySeverity,
+        issuesByCategory: result.issuesByCategory,
+        ruleResults: result.ruleResults,
       },
       processingTimeMs: Date.now() - startTime,
     };
@@ -176,22 +217,137 @@ export async function processDetectRunJob(
 }
 
 /**
+ * Build data quality report for the detection context.
+ */
+function buildDataQualityReport(
+  data: SnapshotData,
+  config: DetectionConfig
+): DataQualityReport {
+  // Calculate usage data age
+  let latestUsage = new Date(0);
+  for (const e of data.usageEvents) {
+    const eventDate = e.event_date instanceof Date ? e.event_date : new Date(e.event_date);
+    if (eventDate > latestUsage) {
+      latestUsage = eventDate;
+    }
+  }
+  const usageAgeHours = data.usageEvents.length > 0
+    ? (Date.now() - latestUsage.getTime()) / (1000 * 60 * 60)
+    : 0;
+
+  // Calculate CRM data age (using contract updated_at)
+  let latestContract = new Date(0);
+  for (const c of data.contracts) {
+    const updatedAt = c.updated_at instanceof Date ? c.updated_at : new Date(c.updated_at);
+    if (updatedAt > latestContract) {
+      latestContract = updatedAt;
+    }
+  }
+  const crmAgeHours = data.contracts.length > 0
+    ? (Date.now() - latestContract.getTime()) / (1000 * 60 * 60)
+    : 0;
+
+  // Build contract readiness map (use 1.0 as default if no readiness data)
+  const contractReadiness = new Map<string, number>();
+  for (const contract of data.contracts) {
+    // Check if contract has readiness data in metadata
+    const metadata = contract.metadata_json as Record<string, unknown> | null;
+    const readiness = typeof metadata?.readinessScore === 'number' 
+      ? metadata.readinessScore 
+      : 1.0;
+    contractReadiness.set(contract.id, readiness);
+  }
+
+  // Available FX currencies
+  const fxCurrencies = new Set<string>();
+  for (const key of data.fxRates.keys()) {
+    const [from] = key.split('_');
+    fxCurrencies.add(from);
+  }
+
+  // Check for missing master data
+  const missingMasterData: string[] = [];
+  const customerIds = new Set(data.customers.map(c => c.id));
+  const productIds = new Set(data.products.map(p => p.id));
+
+  for (const contract of data.contracts) {
+    if (contract.customer_id && !customerIds.has(contract.customer_id)) {
+      missingMasterData.push(`Contract ${contract.id} references missing customer ${contract.customer_id}`);
+    }
+  }
+
+  for (const invoice of data.invoices) {
+    if (invoice.customer_id && !customerIds.has(invoice.customer_id)) {
+      missingMasterData.push(`Invoice ${invoice.id} references missing customer ${invoice.customer_id}`);
+    }
+    for (const line of invoice.lines) {
+      if (line.product_id && !productIds.has(line.product_id)) {
+        missingMasterData.push(`Invoice line ${line.id} references missing product ${line.product_id}`);
+      }
+    }
+  }
+
+  // Calculate snapshot completeness (compare to prior snapshot if available)
+  let snapshotCompleteness = 1.0;
+  if (data.priorSnapshot) {
+    // Simple heuristic: compare record counts
+    // In production, you'd do more sophisticated comparison
+    const priorContractCount = data.priorIssues.length > 0 ? data.contracts.length : 1;
+    if (priorContractCount > 0 && data.contracts.length < priorContractCount * 0.5) {
+      snapshotCompleteness = data.contracts.length / priorContractCount;
+    }
+  }
+
+  return {
+    snapshotCompleteness,
+    usageDataStale: usageAgeHours > config.gating.usageStalenessHours,
+    usageDataAgeHours: usageAgeHours,
+    crmDataStale: crmAgeHours > config.gating.crmStalenessHours,
+    crmDataAgeHours: crmAgeHours,
+    contractReadiness,
+    missingMasterData: missingMasterData.slice(0, 10), // Limit to first 10 warnings
+    fxRatesAvailable: fxCurrencies,
+    priorSnapshot: data.priorSnapshot,
+  };
+}
+
+/**
+ * Snapshot data structure for detection.
+ */
+interface SnapshotData {
+  snapshot: Snapshot;
+  contracts: ContractWithTerms[];
+  invoices: InvoiceWithLines[];
+  payments: any[];
+  usageEvents: any[];
+  customers: any[];
+  products: any[];
+  schedules: ScheduleWithObligation[];
+  obligations: any[];
+  fxRates: Map<string, number>;
+  priorSnapshot?: Snapshot;
+  priorIssues: any[];
+}
+
+/**
  * Load snapshot data for detection.
  */
 async function loadSnapshotData(
   db: Kysely<Database>,
   tenantId: string,
   snapshotId: string
-): Promise<{
-  contracts: any[];
-  invoices: any[];
-  payments: any[];
-  usageEvents: any[];
-  customers: any[];
-  products: any[];
-  schedules: any[];
-  obligations: any[];
-}> {
+): Promise<SnapshotData> {
+  // Load the snapshot itself
+  const snapshot = await db
+    .selectFrom('snapshots')
+    .selectAll()
+    .where('id', '=', snapshotId)
+    .where('tenant_id', '=', tenantId)
+    .executeTakeFirst();
+
+  if (!snapshot) {
+    throw new Error(`Snapshot ${snapshotId} not found`);
+  }
   // Load contracts with terms
   const contracts = await db
     .selectFrom('contracts')
@@ -215,13 +371,22 @@ async function loadSnapshotData(
     .where('contract_version_id', 'in', versionIds.length > 0 ? versionIds : ['_none_'])
     .execute();
 
-  // Attach terms to contracts
-  const contractsWithTerms = contracts.map(c => {
+  // Load customers first (needed to attach to contracts and invoices)
+  const customers = await db
+    .selectFrom('customers')
+    .selectAll()
+    .where('tenant_id', '=', tenantId)
+    .where('snapshot_id', '=', snapshotId)
+    .execute();
+
+  // Attach terms and customers to contracts
+  const contractsWithTerms: ContractWithTerms[] = contracts.map(c => {
     const version = versions.find(v => v.contract_id === c.id);
     const contractTerms = version 
       ? terms.filter(t => t.contract_version_id === version.id)
       : [];
-    return { ...c, terms: contractTerms };
+    const customer = customers.find(cust => cust.id === c.customer_id);
+    return { ...c, terms: contractTerms, customer };
   });
 
   // Load invoices with lines
@@ -239,9 +404,11 @@ async function loadSnapshotData(
     .where('invoice_id', 'in', invoiceIds.length > 0 ? invoiceIds : ['_none_'])
     .execute();
 
-  const invoicesWithLines = invoices.map(inv => ({
+  // Attach lines and customers to invoices
+  const invoicesWithLines: InvoiceWithLines[] = invoices.map(inv => ({
     ...inv,
     lines: lines.filter(l => l.invoice_id === inv.id),
+    customer: customers.find(cust => cust.id === inv.customer_id),
   }));
 
   // Load other entities
@@ -254,13 +421,6 @@ async function loadSnapshotData(
 
   const usageEvents = await db
     .selectFrom('usage_events')
-    .selectAll()
-    .where('tenant_id', '=', tenantId)
-    .where('snapshot_id', '=', snapshotId)
-    .execute();
-
-  const customers = await db
-    .selectFrom('customers')
     .selectAll()
     .where('tenant_id', '=', tenantId)
     .where('snapshot_id', '=', snapshotId)
@@ -288,12 +448,48 @@ async function loadSnapshotData(
     .where('obligation_id', 'in', obligationIds.length > 0 ? obligationIds : ['_none_'])
     .execute();
 
-  const schedulesWithObligations = schedules.map(s => ({
+  const schedulesWithObligations: ScheduleWithObligation[] = schedules.map(s => ({
     ...s,
     obligation: obligations.find(o => o.id === s.obligation_id),
   }));
 
+  // Load FX rates
+  const fxRatesRaw = await db
+    .selectFrom('fx_rates')
+    .select(['from_currency', 'to_currency', 'rate_date', 'rate'])
+    .where('tenant_id', '=', tenantId)
+    .execute();
+
+  const fxRates = new Map<string, number>();
+  for (const rate of fxRatesRaw) {
+    const dateKey = rate.rate_date instanceof Date 
+      ? rate.rate_date.toISOString().split('T')[0] 
+      : String(rate.rate_date);
+    const key = `${rate.from_currency}_${rate.to_currency}_${dateKey}`;
+    fxRates.set(key, Number(rate.rate));
+  }
+
+  // Load prior snapshot for cross-snapshot rules
+  const priorSnapshot = await db
+    .selectFrom('snapshots')
+    .selectAll()
+    .where('tenant_id', '=', tenantId)
+    .where('created_at', '<', snapshot.created_at)
+    .orderBy('created_at', 'desc')
+    .limit(1)
+    .executeTakeFirst();
+
+  // Load prior issues if prior snapshot exists
+  const priorIssues = priorSnapshot
+    ? await db
+        .selectFrom('issues')
+        .selectAll()
+        .where('snapshot_id', '=', priorSnapshot.id)
+        .execute()
+    : [];
+
   return {
+    snapshot,
     contracts: contractsWithTerms,
     invoices: invoicesWithLines,
     payments,
@@ -302,5 +498,8 @@ async function loadSnapshotData(
     products,
     schedules: schedulesWithObligations,
     obligations,
+    fxRates,
+    priorSnapshot,
+    priorIssues,
   };
 }

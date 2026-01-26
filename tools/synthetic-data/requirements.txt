@@ -1,0 +1,20 @@
+# Core
+openai>=1.0.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pandas>=2.0.0
+python-dateutil>=2.8.0
+
+# Faker support
+faker>=22.0.0
+
+# CUAD dataset
+datasets>=2.14.0
+huggingface-hub>=0.17.0
+
+# PDF generation
+weasyprint>=60.0
+jinja2>=3.1.0
+
+# Alternative PDF (simpler, no system deps) - uncomment if weasyprint has issues
+# fpdf2>=2.7.0

@@ -6,6 +6,7 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+.vite/
 
 # Environment
 .env
@@ -35,7 +36,7 @@ docker/data/
 
 # Repo-specific
 .website/
-nodemodules/
+.playwright-mcp/
 
 # Caches
 .eslintcache
@@ -77,3 +78,12 @@ test-results/
 # Terraform (if used)
 .terraform/
 *.tfstate*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
