@@ -15,11 +15,15 @@ import {
   llm, 
   contracts 
 } from '@cogtics/utils';
-import { createRequire } from 'module';
-
-// Use createRequire for CommonJS module pdf-parse (v1.x)
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+// Lazy-load pdf-parse (CommonJS) via dynamic import to avoid createRequire in bundled ESM
+let pdfParse: undefined | ((data: Buffer) => Promise<any>);
+const getPdfParse = async () => {
+  if (!pdfParse) {
+    const mod = await import('pdf-parse');
+    pdfParse = ((mod as { default?: typeof pdfParse }).default ?? mod) as typeof pdfParse;
+  }
+  return pdfParse!;
+};
 
 interface JobResult {
   success: boolean;
@@ -87,6 +91,7 @@ export async function processPdfParseJob(
 
     try {
       // Parse PDF using pdf-parse library (v1.x - simple function API)
+      const pdfParse = await getPdfParse();
       const pdfData = await pdfParse(pdfBuffer);
       
       extractedText = pdfData.text || '';

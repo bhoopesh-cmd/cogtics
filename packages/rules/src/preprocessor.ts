@@ -236,6 +236,12 @@ function buildDataQualityReport(
     missingMasterData.push(`${contractsWithoutCustomer.length} contracts without customer`);
   }
 
+  // Check invoices without contracts (orphan invoices)
+  const invoicesWithoutContract = invoices.filter(inv => !inv.contract_id);
+  if (invoicesWithoutContract.length > 0) {
+    missingMasterData.push(`${invoicesWithoutContract.length} orphan invoices without contract`);
+  }
+
   // Calculate snapshot completeness
   const snapshotCompleteness = calculateSnapshotCompleteness(
     contracts,

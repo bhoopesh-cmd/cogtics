@@ -183,6 +183,14 @@ class TemplateStore:
             placeholder = f"[{key.upper()}]"
             result = result.replace(placeholder, str(value))
         return result
+
+    def inject_variation(self, text: str) -> str:
+        """
+        Apply phrasing and structure variations to a clause.
+        """
+        if self._extractor:
+            return self._extractor.inject_variation(text)
+        return text
     
     def is_cuad_available(self) -> bool:
         """Check if CUAD dataset is available."""

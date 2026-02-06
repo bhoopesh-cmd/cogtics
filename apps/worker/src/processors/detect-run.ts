@@ -2,6 +2,7 @@
  * Detection Run Processor
  * 
  * Executes detection rules against a snapshot and persists issues.
+ * Supports AI-powered enrichment (Tier 2) when enabled.
  */
 import type { Logger } from 'pino';
 import type { Kysely } from 'kysely';
@@ -24,6 +25,10 @@ import {
   type ScheduleWithObligation,
   type RuleIssue,
 } from '@cogtics/rules';
+import { llm } from '@cogtics/utils';
+import type { AIDiscoveredIssue, AIEnrichedIssue } from '@cogtics/rules';
+
+const { DetectionLLM, AnomalyDetectionLLM } = llm;
 
 interface JobResult {
   success: boolean;
@@ -110,11 +115,132 @@ export async function processDetectRunJob(
       durationMs: result.durationMs,
     }, 'Detection rules completed');
 
+    // 6.5. AI Enrichment (Tier 2) - if enabled
+    let enrichedIssues: AIEnrichedIssue[] = [];
+    let aiEnrichmentStats: Record<string, unknown> | null = null;
+
+    if (detectionConfig.aiEnrichment?.enabled && result.issues.length > 0) {
+      logger.info({ issueCount: result.issues.length }, 'Starting AI enrichment');
+      
+      try {
+        const enrichmentStart = Date.now();
+        const llm = new DetectionLLM();
+        
+        // Limit issues to enrich based on config
+        const maxIssues = detectionConfig.aiEnrichment.maxIssuesPerRun || 50;
+        const minConfidence = detectionConfig.aiEnrichment.minConfidenceToEnrich || 0.5;
+        
+        // Filter issues by confidence and limit
+        const issuesToEnrich = result.issues
+          .filter(i => i.confidence >= minConfidence)
+          .slice(0, maxIssues);
+        
+        if (issuesToEnrich.length > 0) {
+          enrichedIssues = await llm.enrichIssues(issuesToEnrich, {
+            contracts: data.contracts,
+            invoices: data.invoices,
+            customers: data.customers,
+          });
+          
+          aiEnrichmentStats = {
+            totalIssues: result.issues.length,
+            enrichedCount: enrichedIssues.length,
+            skippedCount: result.issues.length - issuesToEnrich.length,
+            durationMs: Date.now() - enrichmentStart,
+          };
+          
+          logger.info({
+            enrichedCount: enrichedIssues.length,
+            durationMs: aiEnrichmentStats.durationMs,
+          }, 'AI enrichment completed');
+        }
+      } catch (aiError) {
+        logger.warn({ error: aiError }, 'AI enrichment failed, continuing with rule-based issues');
+        aiEnrichmentStats = {
+          error: aiError instanceof Error ? aiError.message : 'Unknown error',
+          enrichedCount: 0,
+        };
+      }
+    }
+
+    // Create a map of enriched issues by issue key for lookup
+    const enrichedByKey = new Map<string, AIEnrichedIssue>();
+    for (const enriched of enrichedIssues) {
+      enrichedByKey.set(enriched.issueKey, enriched);
+    }
+
+    // 6.6. AI Anomaly Detection (Tier 3) - if enabled
+    let aiDiscoveries: AIDiscoveredIssue[] = [];
+    let aiAnomalyStats: Record<string, unknown> | null = null;
+
+    if (detectionConfig.aiAnomalyDetection?.enabled) {
+      logger.info('Starting AI anomaly detection');
+      
+      try {
+        const anomalyStart = Date.now();
+        const anomalyLLM = new AnomalyDetectionLLM();
+        
+        aiDiscoveries = await anomalyLLM.detectAnomalies(
+          context,
+          result.issues,
+          {
+            minConfidenceToReport: detectionConfig.aiAnomalyDetection.minConfidenceToReport || 0.7,
+            maxAnomaliesPerRun: detectionConfig.aiAnomalyDetection.maxAnomaliesPerRun || 20,
+            categories: detectionConfig.aiAnomalyDetection.categories || ['semantic', 'pattern'],
+          }
+        );
+
+        aiAnomalyStats = {
+          anomaliesFound: aiDiscoveries.length,
+          byCategory: aiDiscoveries.reduce((acc, d) => {
+            acc[d.category] = (acc[d.category] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>),
+          durationMs: Date.now() - anomalyStart,
+        };
+
+        logger.info({
+          anomaliesFound: aiDiscoveries.length,
+          durationMs: aiAnomalyStats.durationMs,
+        }, 'AI anomaly detection completed');
+
+        // Persist AI discoveries
+        for (const discovery of aiDiscoveries) {
+          await db.insertInto('ai_discovered_issues').values({
+            id: discovery.id,
+            tenant_id: tenantId,
+            snapshot_id: snapshotId,
+            run_id: runId,
+            category: discovery.category,
+            severity: discovery.severity,
+            confidence: discovery.confidence,
+            title: discovery.title,
+            description: discovery.description,
+            evidence_json: discovery.evidence,
+            reasoning: discovery.reasoning,
+            review_status: 'pending',
+            created_at: new Date(),
+            updated_at: new Date(),
+          }).execute();
+        }
+
+      } catch (anomalyError) {
+        logger.warn({ error: anomalyError }, 'AI anomaly detection failed, continuing without');
+        aiAnomalyStats = {
+          error: anomalyError instanceof Error ? anomalyError.message : 'Unknown error',
+          anomaliesFound: 0,
+        };
+      }
+    }
+
     // 7. Persist issues
     for (const issue of result.issues) {
       const issueId = generateIssueId();
       // issueKey is added dynamically by the runner
       const issueKey = (issue as RuleIssue & { issueKey?: string }).issueKey;
+      
+      // Check if we have AI enrichment for this issue
+      const enrichedIssue = issueKey ? enrichedByKey.get(issueKey) : undefined;
       
       await db.insertInto('issues').values({
         id: issueId,
@@ -174,6 +300,9 @@ export async function processDetectRunJob(
           rulesExecuted: result.ruleResults.filter(r => !r.skipped).length,
           rulesSkipped: result.ruleResults.filter(r => r.skipped).length,
           rulesetVersion: result.rulesetVersion,
+          // AI stats (stored in stats_json)
+          aiEnrichment: aiEnrichmentStats,
+          aiAnomalyDetection: aiAnomalyStats,
         },
       })
       .where('id', '=', runId)
@@ -456,16 +585,16 @@ async function loadSnapshotData(
   // Load FX rates
   const fxRatesRaw = await db
     .selectFrom('fx_rates')
-    .select(['from_currency', 'to_currency', 'rate_date', 'rate'])
+    .select(['source_currency', 'target_currency', 'rate_date', 'rate'])
     .where('tenant_id', '=', tenantId)
     .execute();
 
   const fxRates = new Map<string, number>();
   for (const rate of fxRatesRaw) {
-    const dateKey = rate.rate_date instanceof Date 
-      ? rate.rate_date.toISOString().split('T')[0] 
+    const dateKey = rate.rate_date instanceof Date
+      ? rate.rate_date.toISOString().split('T')[0]
       : String(rate.rate_date);
-    const key = `${rate.from_currency}_${rate.to_currency}_${dateKey}`;
+    const key = `${rate.source_currency}_${rate.target_currency}_${dateKey}`;
     fxRates.set(key, Number(rate.rate));
   }
 

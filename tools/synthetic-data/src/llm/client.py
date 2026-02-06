@@ -4,12 +4,16 @@ OpenAI LLM client for text synthesis with batching support.
 
 import logging
 import json
+import os
 from typing import Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..config import config
 
 logger = logging.getLogger(__name__)
+
+# Clause delimiter for batch generation
+CLAUSE_DELIMITER = "<END_CLAUSE>"
 
 
 class LLMClient:
@@ -41,7 +45,19 @@ class LLMClient:
         if self._client is None:
             try:
                 from openai import OpenAI
-                self._client = OpenAI(api_key=self.api_key)
+                # Some environments set a dummy local proxy (127.0.0.1:9) which breaks
+                # outbound calls. Disable env proxies only in that case.
+                proxy_envs = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY")
+                proxy_values = [os.getenv(name, "") for name in proxy_envs]
+                if any("127.0.0.1:9" in val or "localhost:9" in val for val in proxy_values):
+                    try:
+                        import httpx
+                        http_client = httpx.Client(trust_env=False)
+                    except Exception:
+                        http_client = None
+                    self._client = OpenAI(api_key=self.api_key, http_client=http_client)
+                else:
+                    self._client = OpenAI(api_key=self.api_key)
             except ImportError:
                 logger.error(
                     "OpenAI package not installed. "
@@ -247,6 +263,8 @@ class LLMClient:
             }
             if req.get("template"):
                 spec["base_text"] = req["template"][:500]  # Truncate for context
+            if req.get("style_hint"):
+                spec["style_hint"] = req["style_hint"]
             if req.get("terms"):
                 terms = req["terms"]
                 spec["context"] = {
@@ -256,39 +274,61 @@ class LLMClient:
                     "start_date": str(terms.get("start_date", "")),
                     "end_date": str(terms.get("end_date", "")),
                 }
+                if terms.get("language"):
+                    spec["language"] = terms.get("language")
+                if terms.get("language_name"):
+                    spec["language_name"] = terms.get("language_name")
             clauses_spec.append(spec)
         
-        prompt = f"""Generate {len(clause_requests)} contract clauses for a commercial software/SaaS agreement.
+        prompt = f"""Generate {len(clause_requests)} SEPARATE contract clauses for a commercial software/SaaS agreement.
+
+CRITICAL: Each clause must be COMPLETELY INDEPENDENT. Do not merge, combine, or reference other clauses.
 
 For each clause specification below, generate professional, legally sound text.
 If a base_text is provided, rephrase it while maintaining legal meaning.
+If a style_hint is provided, follow it for structure (e.g., subsections, bullets, short tables).
 Include specific values from the context where relevant.
+
+ABSOLUTELY REQUIRED:
+- Each clause is a SEPARATE JSON array element - never combine multiple clauses in one element.
+- Output only the clause body text - NO clause numbering prefixes (no "1.", "2.", "Section X").
+- Do not reference other clause titles or section numbers in the clause body.
+- Use only the provided party names from context (do not invent named entities).
+- If a clause spec includes "language" and it is not "en", write the clause in that language.
+- Do NOT translate party names, product names, or numbers.
+- End each clause text with the exact delimiter: {CLAUSE_DELIMITER}
+- Each "text" field must contain ONLY ONE clause's content.
 
 Clause specifications:
 {json.dumps(clauses_spec, indent=2)}
 
-Return a JSON object with a "clauses" array containing objects with "index" and "text" fields.
-Example: {{"clauses": [{{"index": 0, "text": "1. DEFINITIONS..."}}, ...]}}"""
+Return a JSON object with a "clauses" array. Each element has "index" (matching the spec index) and "text" (the clause body ending with {CLAUSE_DELIMITER}).
+Example: {{"clauses": [{{"index": 0, "text": "The following terms shall have the meanings... {CLAUSE_DELIMITER}"}}, {{"index": 1, "text": "Customer agrees to pay... {CLAUSE_DELIMITER}"}}]}}"""
 
         result = self.generate_json(
             prompt,
             system_prompt=system_prompt or SYSTEM_PROMPTS["contract_clause"],
         )
         
-        # Parse results
+        # Parse results and strip delimiters at source
         clauses = result.get("clauses", [])
         output = [""] * len(clause_requests)
-        
+
         for clause in clauses:
             idx = clause.get("index", -1)
             if 0 <= idx < len(output):
-                output[idx] = clause.get("text", "")
-        
+                text = clause.get("text", "")
+                # Strip delimiter and any content after it (handles clause bleed)
+                if CLAUSE_DELIMITER in text:
+                    text = text.split(CLAUSE_DELIMITER)[0]
+                output[idx] = text.strip()
+
         return output
     
     def generate_contracts_batch(
         self,
         contracts_data: list[dict[str, Any]],
+        system_prompt: Optional[str] = None,
     ) -> list[list[str]]:
         """
         Generate clauses for multiple contracts in batched API calls.
@@ -318,6 +358,7 @@ Example: {{"clauses": [{{"index": 0, "text": "1. DEFINITIONS..."}}, ...]}}"""
                     "title": title,
                     "terms": terms,
                     "template": contract.get("templates", {}).get(title),
+                    "style_hint": contract.get("style_hints", {}).get(title),
                 })
                 contract_indices.append(contract_idx)
         
@@ -334,7 +375,7 @@ Example: {{"clauses": [{{"index": 0, "text": "1. DEFINITIONS..."}}, ...]}}"""
             
             logger.info(f"Generating clauses batch {batch_start//BATCH_SIZE + 1} ({len(batch)} clauses)")
             
-            batch_results = self.generate_all_clauses(batch)
+            batch_results = self.generate_all_clauses(batch, system_prompt=system_prompt)
             
             for i, result in enumerate(batch_results):
                 all_results[batch_start + i] = result
@@ -364,6 +405,28 @@ SYSTEM_PROMPTS = {
     "contract_clause": """You are a legal document specialist who writes commercial contract clauses.
 Generate professional, legally sound contract language.
 Use formal legal terminology and standard clause structures.
+You may use numbered subsections and bullet lists where appropriate.
+Include specific values and dates where placeholders are indicated.
+
+CRITICAL: Each clause must be COMPLETELY SEPARATE. Never combine clauses or include section numbers like "1.", "2." at the start.""",
+
+    "contract_clause_realism": """You are a legal document specialist who writes commercial contract clauses.
+Generate professional, legally sound contract language with realistic structure variety.
+Use formal legal terminology, but vary layout using numbered subsections, bullet lists,
+defined terms in quotes, and occasional short ASCII tables for pricing/SLA when relevant.
+Include cross-references to sections/exhibits where appropriate.
+Do NOT include scanned/OCR artifacts, corrupted text, passwords, or file errors.
+
+CRITICAL SEPARATION RULES (MUST FOLLOW):
+- Each clause you generate must be COMPLETELY SEPARATE and INDEPENDENT.
+- NEVER combine multiple clauses into a single response element.
+- NEVER include another clause's content or title within a clause.
+- Output only the clause body text - NO section numbers like "1.", "2.", "Section 3".
+- Do not reference other clause titles or section numbers in the clause body.
+- Use only the provided party names from context (no invented entities).
+- End each clause with the exact delimiter: <END_CLAUSE>
+- After <END_CLAUSE>, do not add any more text for that clause.
+
 Include specific values and dates where placeholders are indicated.""",
 
     "invoice_description": """You are a billing specialist who writes invoice line item descriptions.
@@ -376,5 +439,6 @@ Include occasional typos, abbreviations, and informal language for realism.""",
 
     "contract_rephrase": """You are a legal editor who rephrases contract clauses.
 Maintain the same legal meaning but vary the wording and structure.
+You may introduce subsections, bullet lists, or brief tables for clarity where appropriate.
 Keep the professional tone and include all specific values.""",
 }

@@ -1,3 +1,4 @@
+import './setup-env.js'; // Must be first to load env vars for local dev
 import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -6,5 +7,9 @@ import path from 'path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, '../../../.env') });
 
+// Start health server for Docker/k8s health checks (Phase 3)
+import { startHealthServer } from './health-server.js';
+startHealthServer();
+
 // Now import and start the worker
-await import('./worker.js');
+import './worker.js';

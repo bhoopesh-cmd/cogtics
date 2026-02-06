@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -17,12 +19,22 @@
     "noPropertyAccessFromIndexSignature": true,
     "exactOptionalPropertyTypes": true,
     "paths": {
-      "@cogtics/connectors": ["./packages/connectors/src/index.ts"],
-      "@cogtics/db": ["./packages/db/src/index.ts"],
-      "@cogtics/schemas": ["./packages/schemas/src/index.ts"],
-      "@cogtics/utils": ["./packages/utils/src/index.ts"]
+      "@cogtics/connectors": [
+        "./packages/connectors/src/index.ts"
+      ],
+      "@cogtics/db": [
+        "./packages/db/src/index.ts"
+      ],
+      "@cogtics/schemas": [
+        "./packages/schemas/src/index.ts"
+      ],
+      "@cogtics/utils": [
+        "./packages/utils/src/index.ts"
+      ]
     }
   },
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
-

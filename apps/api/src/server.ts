@@ -5,8 +5,8 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import fastifyStatic from '@fastify/static';
-import { 
-  loadApiConfig, 
+import {
+  loadApiConfig,
   createLogger,
   initTelemetrySync,
   initMetrics,
@@ -24,6 +24,7 @@ import { auditPlugin } from './plugins/audit.js';
 import { queuePlugin } from './plugins/queue.js';
 import { connectorsPlugin } from './plugins/connectors.js';
 import { storagePlugin } from './plugins/storage.js';
+import { multipartPlugin } from './plugins/multipart.js';
 
 // Routes
 import { healthRoutes } from './routes/health.js';
@@ -83,19 +84,23 @@ async function main() {
   const logger = createLogger({
     name: 'cogtics-api',
     level: config.LOG_LEVEL,
-    lokiUrl: process.env['LOKI_URL'],
+    lokiUrl: process.env['LOKI_URL'] || '',
     enableTraceContext: telemetryEnabled,
   });
 
   // Create Fastify instance
   const app = Fastify({
-    logger: logger,
+    logger: logger as any,
     genReqId: () => `req_${Date.now().toString(36)}${Math.random().toString(36).substring(2, 8)}`,
     requestIdHeader: 'x-request-id',
   });
 
-  // Register core plugins
-  await app.register(cors, { origin: true });
+  // Register core plugins - CORS with allowlist (security fix)
+  const allowedOrigins = config.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || ['http://localhost:5173'];
+  await app.register(cors, {
+    origin: allowedOrigins,
+    credentials: true,
+  });
   await app.register(sensible);
 
   // Request timing and metrics hook (Phase 11)
@@ -108,7 +113,7 @@ async function main() {
     if (startTime) {
       const duration = Date.now() - startTime;
       const route = request.routeOptions?.url || request.url;
-      
+
       // Skip logging for sampled paths (health checks, metrics)
       if (!shouldSampleLog(route)) {
         recordApiRequest(request.method, route, reply.statusCode, duration);
@@ -126,6 +131,7 @@ async function main() {
   await app.register(auditPlugin);
   await app.register(connectorsPlugin);
   await app.register(storagePlugin);
+  await app.register(multipartPlugin);
 
   // Register API routes
   await app.register(healthRoutes);

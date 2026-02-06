@@ -54,6 +54,24 @@ class UsageRecord(BaseModel):
         use_enum_values = True
 
 
+class UsageEvent(BaseModel):
+    """Usage event for real-time metering."""
+    id: str
+    tenant_id: str
+    snapshot_id: str
+    customer_id: Optional[str] = None
+    contract_id: Optional[str] = None
+    event_timestamp: datetime
+    metric_name: str
+    quantity: Decimal
+    unit_price: Optional[Decimal] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        use_enum_values = True
+
+
 class UsageSummary(BaseModel):
     """Aggregated usage for a billing period."""
     id: str

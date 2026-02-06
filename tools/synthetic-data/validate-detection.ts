@@ -69,17 +69,22 @@ interface Discrepancy {
   new_period_days?: number;
   original_quantity?: number;
   new_quantity?: number;
+  handled_separately?: boolean;
+  original_invoice_id?: string;  // For actual duplicates
 }
 
 // Map synthetic discrepancy types to Cogtics rule IDs
 const DISCREPANCY_TO_RULE_MAP: Record<string, string[]> = {
-  'amount_under': ['R002'],           // Underbilling
-  'amount_over': ['R003'],            // Overbilling
-  'duplicate_invoice': ['R006'],      // Duplicate Billing
-  'wrong_frequency': ['R010'],        // Billing Frequency Mismatch
-  'wrong_quantity': ['R005'],         // Wrong Quantity
-  'missing_tax': ['T001', 'T002'],    // Tax rules (may need different tier)
-  'extra_line': ['R003', 'R004'],     // Overbilling or Wrong Unit Price
+  'amount_under': ['R002'],                 // Underbilling
+  'amount_over': ['R003'],                  // Overbilling
+  'duplicate_invoice': ['R006'],            // Duplicate Billing
+  'wrong_frequency': ['R010', 'R017'],      // Billing Frequency Mismatch or Period Span Mismatch
+  'wrong_quantity': ['R005'],               // Wrong Quantity
+  'missing_tax': ['R122'],                  // Missing Expected Tax
+  'extra_line': ['R003', 'R004'],           // Overbilling or Wrong Unit Price
+  'missing_invoice': ['R001'],              // Missing Invoice
+  'late_invoice': ['R018'],                 // Invoice Timing Variance (new rule)
+  'orphan_invoice': ['R105'],               // Missing Master Data (orphan invoices)
 };
 
 // ============================================
@@ -452,6 +457,12 @@ async function validateResults(
       // Check rule matches
       if (!expectedRules.includes(issue.ruleId)) return false;
       
+      // Special handling for orphan invoices - match by invoice ID only
+      // (orphan invoices have no contract_id in the issue)
+      if (discrepancy.type === 'orphan_invoice') {
+        return issue.invoiceId === discrepancy.invoice_id;
+      }
+      
       // Check contract/invoice match
       if (issue.contractId !== discrepancy.contract_id) return false;
       if (issue.invoiceId && issue.invoiceId !== discrepancy.invoice_id) return false;
@@ -545,7 +556,27 @@ async function main() {
     console.log(`  Customers: ${customers.length}`);
     console.log(`  Contracts: ${contracts.length}`);
     console.log(`  Invoices: ${invoices.length}`);
-    console.log(`  Expected discrepancies: ${discrepancies.length}`);
+    console.log(`  Raw discrepancies: ${discrepancies.length}`);
+    
+    // Filter out discrepancies that weren't actually applied
+    // - applied: false means the discrepancy wasn't created
+    // - duplicate_invoice with handled_separately but no original_invoice_id means no actual duplicate exists
+    const validDiscrepancies = discrepancies.filter(d => {
+      // Skip if explicitly not applied
+      if (d.applied === false) {
+        return false;
+      }
+      
+      // For duplicate_invoice, check if an actual duplicate was created
+      // Duplicates with handled_separately but without original_invoice_id are false positives
+      if (d.type === 'duplicate_invoice' && d.handled_separately && !d.original_invoice_id) {
+        return false;
+      }
+      
+      return true;
+    });
+    
+    console.log(`  Valid discrepancies: ${validDiscrepancies.length} (filtered ${discrepancies.length - validDiscrepancies.length} unapplied)`);
 
     // Clean and load data
     await cleanupExistingData(db);
@@ -559,8 +590,8 @@ async function main() {
     // Run detection
     const detectionResult = await runDetectionEngine(db);
 
-    // Validate results
-    await validateResults(detectionResult, discrepancies);
+    // Validate results (use filtered discrepancies)
+    await validateResults(detectionResult, validDiscrepancies);
 
   } catch (error) {
     console.error('Validation failed:', error);

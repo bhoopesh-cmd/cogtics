@@ -167,6 +167,34 @@ export const AutoRenewalConfigSchema = z.object({
 });
 export type AutoRenewalConfig = z.infer<typeof AutoRenewalConfigSchema>;
 
+// ============================================
+// AI Detection Configuration Schemas
+// ============================================
+
+export const AIEnrichmentConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  maxIssuesPerRun: z.number().min(1).max(100).default(50),
+  minConfidenceToEnrich: z.number().min(0).max(1).default(0.5),
+  includeRecommendations: z.boolean().default(true),
+});
+export type AIEnrichmentConfig = z.infer<typeof AIEnrichmentConfigSchema>;
+
+export const AIAnomalyDetectionConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  minConfidenceToReport: z.number().min(0).max(1).default(0.7),
+  maxAnomaliesPerRun: z.number().min(1).max(50).default(20),
+  categories: z.array(z.enum(['semantic', 'pattern', 'anomaly', 'contextual'])).default(['semantic', 'pattern']),
+});
+export type AIAnomalyDetectionConfig = z.infer<typeof AIAnomalyDetectionConfigSchema>;
+
+export const LLMCostControlsConfigSchema = z.object({
+  maxCostPerRunUsd: z.number().min(0).default(1.0),
+  preferredModel: z.enum(['gpt-4o', 'gpt-4o-mini']).default('gpt-4o-mini'),
+  enableCaching: z.boolean().default(true),
+  budgetAlertThresholdUsd: z.number().optional(),
+});
+export type LLMCostControlsConfig = z.infer<typeof LLMCostControlsConfigSchema>;
+
 export const DetectionConfigSchema = z.object({
   fx: FxConfigSchema.default({}),
   proration: ProrationConfigSchema.default({}),
@@ -178,6 +206,10 @@ export const DetectionConfigSchema = z.object({
   autoRenewal: AutoRenewalConfigSchema.default({}),
   enabledRules: z.array(z.string()).optional(),
   disabledRules: z.array(z.string()).optional(),
+  // AI Detection Configuration (Tier 2-4)
+  aiEnrichment: AIEnrichmentConfigSchema.optional(),
+  aiAnomalyDetection: AIAnomalyDetectionConfigSchema.optional(),
+  llmCostControls: LLMCostControlsConfigSchema.optional(),
 });
 export type DetectionConfig = z.infer<typeof DetectionConfigSchema>;
 

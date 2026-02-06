@@ -7,6 +7,8 @@ import {
 import * as api from '@/lib/api/endpoints';
 import type { IssueDetail, IssueStatus } from '@/lib/api/endpoints';
 import { EvidencePanel } from './EvidencePanel';
+import { AIAnalysisPanel } from './AIAnalysisPanel';
+import { RecommendationsPanel } from './RecommendationsPanel';
 
 const STATUS_ACTIONS: { status: IssueStatus; label: string; color: string }[] = [
   { status: 'acknowledged', label: 'Acknowledge', color: 'bg-blue-600 hover:bg-blue-500' },
@@ -236,6 +238,12 @@ export function IssueDetailPage() {
               </div>
             </div>
           )}
+
+          {/* AI Analysis Panel */}
+          <AIAnalysisPanel analysis={(issue as any).aiAnalysis || null} />
+
+          {/* AI Recommendations Panel */}
+          <RecommendationsPanel issueId={issue.id} />
 
           {/* Phase 8: Evidence Pack */}
           <EvidencePanel issueId={issue.id} isAdmin={true} />

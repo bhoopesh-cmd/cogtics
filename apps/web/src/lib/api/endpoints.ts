@@ -2351,3 +2351,245 @@ export async function triggerDigest(subscriptionId: string) {
     getToken()
   );
 }
+
+// ============================================
+// AI Discoveries
+// ============================================
+
+export type AIDiscoveryCategory = 'semantic' | 'pattern' | 'anomaly' | 'contextual';
+export type AIDiscoveryReviewStatus = 'pending' | 'confirmed' | 'dismissed';
+
+export interface AIDiscovery {
+  id: string;
+  tenantId: string;
+  snapshotId: string;
+  runId: string;
+  category: AIDiscoveryCategory;
+  severity: IssueSeverity;
+  confidence: number;
+  title: string;
+  description: string;
+  evidence: Record<string, unknown>;
+  reasoning: string;
+  reviewStatus: AIDiscoveryReviewStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  promotedToIssueId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AIDiscoverySummary {
+  total: number;
+  byStatus: Record<AIDiscoveryReviewStatus, number>;
+  byCategory: Record<AIDiscoveryCategory, number>;
+  bySeverity: Record<IssueSeverity, number>;
+}
+
+export async function listAIDiscoveries(params?: {
+  snapshotId?: string;
+  runId?: string;
+  category?: AIDiscoveryCategory;
+  severity?: IssueSeverity;
+  reviewStatus?: AIDiscoveryReviewStatus;
+  limit?: number;
+  offset?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.snapshotId) searchParams.set('snapshotId', params.snapshotId);
+  if (params?.runId) searchParams.set('runId', params.runId);
+  if (params?.category) searchParams.set('category', params.category);
+  if (params?.severity) searchParams.set('severity', params.severity);
+  if (params?.reviewStatus) searchParams.set('reviewStatus', params.reviewStatus);
+  if (params?.limit) searchParams.set('limit', String(params.limit));
+  if (params?.offset) searchParams.set('offset', String(params.offset));
+  
+  const queryStr = searchParams.toString();
+  return apiClient.get<{ discoveries: AIDiscovery[]; total: number; limit: number; offset: number }>(
+    `/issues/ai-discoveries${queryStr ? `?${queryStr}` : ''}`,
+    getToken()
+  );
+}
+
+export async function getAIDiscoverySummary(snapshotId?: string) {
+  const queryStr = snapshotId ? `?snapshotId=${snapshotId}` : '';
+  return apiClient.get<AIDiscoverySummary>(
+    `/issues/ai-discoveries/summary${queryStr}`,
+    getToken()
+  );
+}
+
+export async function getAIDiscovery(id: string) {
+  return apiClient.get<AIDiscovery & { promotedIssue?: Issue }>(
+    `/issues/ai-discoveries/${id}`,
+    getToken()
+  );
+}
+
+export async function promoteAIDiscovery(id: string, data?: {
+  severity?: IssueSeverity;
+  notes?: string;
+}) {
+  return apiClient.post<{ success: boolean; issueId: string; message: string }>(
+    `/issues/ai-discoveries/${id}/promote`,
+    data || {},
+    getToken()
+  );
+}
+
+export async function dismissAIDiscovery(id: string, notes?: string) {
+  return apiClient.post<{ success: boolean; message: string }>(
+    `/issues/ai-discoveries/${id}/dismiss`,
+    { notes },
+    getToken()
+  );
+}
+
+export async function bulkDismissAIDiscoveries(ids: string[], notes?: string) {
+  return apiClient.post<{ success: boolean; dismissed: number }>(
+    `/issues/ai-discoveries/bulk-dismiss`,
+    { ids, notes },
+    getToken()
+  );
+}
+
+// ============================================
+// AI Recommendations
+// ============================================
+
+export type RecommendationPriority = 'critical' | 'high' | 'medium' | 'low';
+export type RecommendationEffort = 'low' | 'medium' | 'high';
+export type RecommendationStatus = 'pending' | 'accepted' | 'dismissed' | 'simulated' | 'applied';
+
+export interface EstimatedImpact {
+  revenueChange?: number;
+  currency?: string;
+  confidence?: number;
+  timeHorizon?: string;
+}
+
+export interface SimulationOverride {
+  type: string;
+  targetId: string;
+  field: string;
+  originalValue: unknown;
+  newValue: unknown;
+  effectiveDate?: string;
+  description?: string;
+}
+
+export interface AIRecommendation {
+  id: string;
+  tenantId: string;
+  snapshotId: string;
+  runId: string | null;
+  issueIds: string[];
+  priority: RecommendationPriority;
+  title: string;
+  description: string;
+  estimatedImpact: EstimatedImpact;
+  suggestedSimulation: {
+    description?: string;
+    overrides: SimulationOverride[];
+  };
+  effort: RecommendationEffort;
+  reasoning: string;
+  status: RecommendationStatus;
+  simulationId: string | null;
+  actionedBy: string | null;
+  actionedAt: string | null;
+  actionNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecommendationSummary {
+  total: number;
+  byStatus: Record<RecommendationStatus, number>;
+  byPriority: Record<RecommendationPriority, number>;
+  totalEstimatedImpact: number;
+}
+
+export async function listRecommendations(params?: {
+  snapshotId?: string;
+  runId?: string;
+  priority?: RecommendationPriority;
+  status?: RecommendationStatus;
+  limit?: number;
+  offset?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.snapshotId) searchParams.set('snapshotId', params.snapshotId);
+  if (params?.runId) searchParams.set('runId', params.runId);
+  if (params?.priority) searchParams.set('priority', params.priority);
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.limit) searchParams.set('limit', String(params.limit));
+  if (params?.offset) searchParams.set('offset', String(params.offset));
+  
+  const queryStr = searchParams.toString();
+  return apiClient.get<{ recommendations: AIRecommendation[]; total: number; limit: number; offset: number }>(
+    `/issues/recommendations${queryStr ? `?${queryStr}` : ''}`,
+    getToken()
+  );
+}
+
+export async function getRecommendationSummary(snapshotId?: string) {
+  const queryStr = snapshotId ? `?snapshotId=${snapshotId}` : '';
+  return apiClient.get<RecommendationSummary>(
+    `/issues/recommendations/summary${queryStr}`,
+    getToken()
+  );
+}
+
+export async function getRecommendation(id: string) {
+  return apiClient.get<AIRecommendation & { issues?: Issue[]; simulation?: unknown }>(
+    `/issues/recommendations/${id}`,
+    getToken()
+  );
+}
+
+export async function getIssueRecommendations(issueId: string) {
+  return apiClient.get<{ recommendations: AIRecommendation[]; total: number }>(
+    `/issues/${issueId}/recommendations`,
+    getToken()
+  );
+}
+
+export async function createSimulationFromRecommendation(id: string, data?: {
+  name?: string;
+  notes?: string;
+}) {
+  return apiClient.post<{ success: boolean; simulationId: string; message: string }>(
+    `/issues/recommendations/${id}/simulate`,
+    data || {},
+    getToken()
+  );
+}
+
+export async function applyRecommendation(id: string, data?: {
+  notes?: string;
+  skipSimulation?: boolean;
+}) {
+  return apiClient.post<{ success: boolean; message: string; issuesUpdated: number }>(
+    `/issues/recommendations/${id}/apply`,
+    data || {},
+    getToken()
+  );
+}
+
+export async function dismissRecommendation(id: string, notes?: string) {
+  return apiClient.post<{ success: boolean; message: string }>(
+    `/issues/recommendations/${id}/dismiss`,
+    { notes },
+    getToken()
+  );
+}
+
+export async function acceptRecommendation(id: string, notes?: string) {
+  return apiClient.post<{ success: boolean; message: string }>(
+    `/issues/recommendations/${id}/accept`,
+    { notes },
+    getToken()
+  );
+}

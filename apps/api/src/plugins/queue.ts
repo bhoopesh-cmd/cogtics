@@ -14,7 +14,49 @@ declare module 'fastify' {
   }
 }
 
-const QUEUE_NAMES: QueueName[] = ['sync', 'detect', 'simulate', 'export', 'ingest.load', 'ingest.normalize', 'ingest.upsert', 'ingest.finalize', 'ingest.full', 'revrec.compute', 'revrec.reconcile', 'detect.run', 'detect.replay', 'upload.csv.parse', 'upload.pdf.parse', 'upload.reprocess'];
+const QUEUE_NAMES: QueueName[] = [
+  // Core queues
+  'sync',
+  'detect',
+  'simulate',
+  'export',
+  // Ingestion queues 
+  'ingest.load',
+  'ingest.normalize',
+  'ingest.upsert',
+  'ingest.finalize',
+  'ingest.full',
+  // Identity queues
+  'identity.resolve',
+  'identity.apply',
+  // Upload queues
+  'upload.csv.parse',
+  'upload.csv.finalize',
+  'upload.pdf.parse',
+  'upload.reprocess',
+  // Contract intelligence queues
+  'contracts.pdf.extract',
+  'contracts.clause.segment',
+  'contracts.terms.extract',
+  'contracts.readiness.compute',
+  // RevRec queues
+  'revrec.compute',
+  'revrec.reconcile',
+  // Detection queues
+  'detect.run',
+  'detect.replay',
+  // Evidence queues (PREVIOUSLY MISSING - caused 500 errors)
+  'evidence.generate',
+  'evidence.regenerate',
+  // Simulation queues (PREVIOUSLY MISSING)
+  'simulation.run',
+  'simulation.replay',
+  // Export queues
+  'export.csv.generate',
+  'export.pdf.render',
+  // Digest queue
+  'digest.send',
+];
 
 const queuePluginImpl: FastifyPluginAsync = async (fastify) => {
   const redis = new Redis(fastify.config.REDIS_URL, {
@@ -40,7 +82,7 @@ const queuePluginImpl: FastifyPluginAsync = async (fastify) => {
 
   fastify.decorate('redis', redis);
   fastify.decorate('queues', queues as Record<QueueName, Queue>);
-  
+
   // Generic job queue interface that routes to the correct queue by job name
   fastify.decorate('jobQueue', {
     add: async (name: string, data: unknown) => {

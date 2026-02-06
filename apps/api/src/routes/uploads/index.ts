@@ -158,8 +158,23 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         .where('id', '=', body.uploadId)
         .execute();
 
-      // Enqueue parse job
+      // Enqueue parse job (with backpressure check)
       if (body.autoProcess) {
+        // Phase 2: Check queue depth before enqueuing
+        const { canEnqueueJob } = await import('../../lib/queue-depth.js');
+        const queueCheck = await canEnqueueJob(fastify, 'upload.csv.parse');
+
+        if (!queueCheck.canEnqueue) {
+          // Queue is full - return HTTP 429
+          return reply.status(429).send({
+            error: 'Too Many Requests',
+            message: `Upload queue is currently at capacity (${queueCheck.currentDepth}/${queueCheck.limit} jobs). Please try again in ${queueCheck.retryAfterSeconds} seconds.`,
+            retryAfter: queueCheck.retryAfterSeconds,
+            queueDepth: queueCheck.currentDepth,
+            queueLimit: queueCheck.limit,
+          });
+        }
+
         await fastify.jobQueue.add('upload.csv.parse', {
           tenantId,
           payload: {
@@ -305,8 +320,23 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         .where('id', '=', body.uploadId)
         .execute();
 
-      // Enqueue PDF parse job
+      // Enqueue PDF parse job (with backpressure check)
       if (body.autoProcess) {
+        // Phase 2: Check queue depth before enqueuing
+        const { canEnqueueJob } = await import('../../lib/queue-depth.js');
+        const queueCheck = await canEnqueueJob(fastify, 'upload.pdf.parse');
+
+        if (!queueCheck.canEnqueue) {
+          // Queue is full - return HTTP 429
+          return reply.status(429).send({
+            error: 'Too Many Requests',
+            message: `Upload queue is currently at capacity (${queueCheck.currentDepth}/${queueCheck.limit} jobs). Please try again in ${queueCheck.retryAfterSeconds} seconds.`,
+            retryAfter: queueCheck.retryAfterSeconds,
+            queueDepth: queueCheck.currentDepth,
+            queueLimit: queueCheck.limit,
+          });
+        }
+
         await fastify.jobQueue.add('upload.pdf.parse', {
           tenantId,
           payload: {

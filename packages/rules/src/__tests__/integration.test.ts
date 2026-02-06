@@ -14,7 +14,7 @@ describe('Detection Pipeline Integration', () => {
 
   describe('Rule Registry', () => {
     it('should have 59 rules registered', () => {
-      expect(allRules.length).toBe(59);
+      expect(allRules.length).toBe(62);
     });
 
     it('should have unique rule IDs', () => {
@@ -47,7 +47,7 @@ describe('Detection Pipeline Integration', () => {
 
     it('should count all registered rules', () => {
       const registry = getRegistry();
-      expect(registry.count()).toBe(59);
+      expect(registry.count()).toBe(62);
     });
   });
 
@@ -91,7 +91,7 @@ describe('Detection Pipeline Integration', () => {
       }
       
       expect(countByTier['data_quality']).toBe(6);
-      expect(countByTier['billing']).toBe(10);
+      expect(countByTier['billing']).toBe(12);
       expect(countByTier['discount']).toBe(6);
       expect(countByTier['revrec']).toBe(8);
       expect(countByTier['credits']).toBe(4);
@@ -99,7 +99,7 @@ describe('Detection Pipeline Integration', () => {
       expect(countByTier['lifecycle']).toBe(7);
       expect(countByTier['multi_entity']).toBe(4);
       expect(countByTier['cross_snapshot']).toBe(4);
-      expect(countByTier['tax_fees']).toBe(2);
+      expect(countByTier['tax_fees']).toBe(3);
       expect(countByTier['fx_currency']).toBe(3);
     });
   });

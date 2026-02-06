@@ -8,8 +8,8 @@ import { createTestContext } from './fixtures.js';
 
 describe('Tier 9: Tax/Fee Rules', () => {
   describe('Rule Registration', () => {
-    it('should have 2 tax/fee rules', () => {
-      expect(taxFeesRules.length).toBe(2);
+    it('should have 3 tax/fee rules', () => {
+      expect(taxFeesRules.length).toBe(3);
     });
 
     it('all rules should have correct tier and category', () => {

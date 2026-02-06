@@ -12,6 +12,7 @@
  */
 
 import { createContractLLM, isLLMAvailable } from './client.js';
+import { CSVAnalysisResultSchema, safeParseLLMResponse } from './schemas.js';
 
 /**
  * Supported entity types for CSV uploads
@@ -215,8 +216,17 @@ Provide analysis in this JSON format:
 
     const response = await (llm as any).complete(systemPrompt, userPrompt, { json: true });
     
-    const parsed = JSON.parse(response);
-    const detectedType = parsed.entityType || 'unknown';
+    // Validate response with Zod schema
+    const parsed = safeParseLLMResponse(CSVAnalysisResultSchema, response, {
+      entityType: 'unknown',
+      entityTypeConfidence: 0.5,
+      columnMappings: [],
+      requiredMissing: [],
+      suggestions: [],
+      warnings: ['Failed to parse AI response'],
+    });
+    
+    const detectedType = parsed?.entityType || 'unknown';
     const schema = ENTITY_SCHEMA[detectedType as CSVEntityType] || ENTITY_SCHEMA.unknown;
     
     // Ensure all columns are mapped (AI should do this, but validate)

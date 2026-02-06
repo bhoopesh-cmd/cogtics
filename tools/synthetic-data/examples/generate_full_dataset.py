@@ -190,6 +190,17 @@ def generate_contracts(
                 confidence=90,
                 extraction_method="synthetic",
             ),
+            # Explicit quantity term for R005 detection
+            ContractTerm(
+                id=f"term_{faker._short_uuid()}",
+                tenant_id=faker.tenant_id,
+                snapshot_id=faker.snapshot_id,
+                contract_version_id=version_id,
+                term_type=TermType.QUANTITY,
+                value={"quantity": quantity, "productId": None},
+                confidence=95,
+                extraction_method="synthetic",
+            ),
         ]
         
         # Store data for batch processing

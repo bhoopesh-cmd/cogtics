@@ -2,7 +2,9 @@
 export * from './config.js';
 
 // Storage
+// Storage
 export * from './storage.js';
+export * from './storage/minio-client.js';
 
 // Logging
 export * from './logger.js';

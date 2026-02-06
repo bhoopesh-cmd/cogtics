@@ -43,7 +43,7 @@ describe('Phase 7 Smoke Tests', () => {
       expect(Array.isArray(allRules)).toBe(true);
       
       // Should have 59 rules
-      expect(allRules.length).toBe(59);
+      expect(allRules.length).toBe(62);
     });
 
     it('should export rules by category', async () => {
@@ -71,7 +71,7 @@ describe('Phase 7 Smoke Tests', () => {
       initializeRules();
       const registry = getRegistry();
       
-      expect(registry.count()).toBe(59);
+      expect(registry.count()).toBe(62);
     });
 
     it('should have unique rule IDs', async () => {
@@ -148,7 +148,7 @@ describe('Phase 7 Smoke Tests', () => {
       
       // Expected counts per plan
       expect(countByTier['data_quality']).toBe(6);  // R100-R105
-      expect(countByTier['billing']).toBe(10);       // R001-R010
+      expect(countByTier['billing']).toBe(12);       // R001-R010, R017, R018
       expect(countByTier['discount']).toBe(6);       // R011-R016
       expect(countByTier['revrec']).toBe(8);         // R020-R027
       expect(countByTier['credits']).toBe(4);        // R110-R113
@@ -156,7 +156,7 @@ describe('Phase 7 Smoke Tests', () => {
       expect(countByTier['lifecycle']).toBe(7);      // R060-R064, R160-R161
       expect(countByTier['multi_entity']).toBe(4);   // R170-R173
       expect(countByTier['cross_snapshot']).toBe(4); // R080-R083
-      expect(countByTier['tax_fees']).toBe(2);       // R120-R121
+      expect(countByTier['tax_fees']).toBe(3);       // R120-R122
       expect(countByTier['fx_currency']).toBe(3);    // R130-R132
     });
   });

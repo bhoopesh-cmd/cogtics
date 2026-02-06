@@ -7,6 +7,7 @@
  */
 
 import { ContractLLM, createContractLLM } from './client.js';
+import { StructuredContractDataSchema, safeParseLLMResponse } from './schemas.js';
 
 export interface DocumentExtractionResult {
   success: boolean;
@@ -184,11 +185,15 @@ export async function extractStructuredFromImage(
       throw new Error('Empty response from OpenAI');
     }
 
-    const structuredData = JSON.parse(content) as StructuredContractData;
+    // Validate response with Zod schema
+    const structuredData = safeParseLLMResponse(StructuredContractDataSchema, content);
+    if (!structuredData) {
+      throw new Error('Failed to parse structured contract data from response');
+    }
 
     return {
       success: true,
-      structuredData,
+      structuredData: structuredData as StructuredContractData,
       ocrUsed: true,
       model: 'gpt-4o',
       tokensUsed: data.usage?.total_tokens,
@@ -339,12 +344,16 @@ export async function extractStructuredFromText(
       throw new Error('Empty response from OpenAI');
     }
 
-    const structuredData = JSON.parse(content) as StructuredContractData;
+    // Validate response with Zod schema
+    const structuredData = safeParseLLMResponse(StructuredContractDataSchema, content);
+    if (!structuredData) {
+      throw new Error('Failed to parse structured contract data from response');
+    }
 
     return {
       success: true,
       extractedText: text,
-      structuredData,
+      structuredData: structuredData as StructuredContractData,
       ocrUsed: false,
       model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
       tokensUsed: data.usage?.total_tokens,

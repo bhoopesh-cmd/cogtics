@@ -2,7 +2,39 @@
 
 ## Overview
 
-The Detection Engine is the core analytical component of Cogtics that automatically identifies discrepancies, compliance issues, and anomalies across contract, billing, and revenue data. It operates on a tiered execution model with 59 detection rules across 11 categories.
+The Detection Engine is the core analytical component of Cogtics that automatically identifies discrepancies, compliance issues, and anomalies across contract, billing, and revenue data. It operates on a tiered execution model with 62 detection rules across 11 categories.
+
+---
+
+## Rule ID Allocation
+
+To prevent ID conflicts when adding new rules, follow this allocation table:
+
+| Range | Category | Count | Notes |
+|-------|----------|-------|-------|
+| R001-R010, R017-R018 | billing | 12 | Core billing vs contract rules |
+| R011-R016 | discount | 6 | Discount and pricing rules |
+| R020-R027 | revrec | 8 | Revenue recognition rules |
+| R060-R064, R160-R161 | lifecycle | 7 | Contract lifecycle rules |
+| R080-R083 | cross_snapshot | 4 | Cross-snapshot consistency |
+| R100-R105 | data_quality | 6 | Data quality gates (Tier 0) |
+| R110-R113 | credits | 4 | Credits and refunds |
+| R120-R122 | tax_fees | 3 | Tax/fee rules |
+| R130-R132 | fx_currency | 3 | FX and currency rules |
+| R150-R154 | usage | 5 | Usage-based billing |
+| R170-R173 | multi_entity | 4 | Multi-entity rules |
+
+**Reserved ranges for future expansion:**
+- R018-R019: Additional billing rules
+- R028-R039: Additional rev-rec rules
+- R065-R079: Additional lifecycle rules
+- R084-R099: Additional cross-snapshot rules
+- R114-R119: Additional credits rules
+- R123-R129: Additional tax/fee rules
+- R133-R149: Additional FX rules
+- R155-R159: Additional usage rules
+- R162-R169: Reserved
+- R174-R199: Additional multi-entity rules
 
 ## Architecture
 
@@ -42,7 +74,7 @@ Snapshot Data → Preprocessor → Rule Registry → Runner → Deduplicator →
 
 ---
 
-## Tier 1: Billing vs Contract (10 rules)
+## Tier 1: Billing vs Contract (12 rules)
 
 | Rule ID | Name | Description | Severity |
 |---------|------|-------------|----------|
@@ -51,11 +83,13 @@ Snapshot Data → Preprocessor → Rule Registry → Runner → Deduplicator →
 | R003 | Overbilling | Invoiced amount exceeds contracted amount | High |
 | R004 | Wrong Unit Price | Invoice line unit price differs from contract | High |
 | R005 | Wrong Quantity | Invoice line quantity differs from contract | High |
-| R006 | Duplicate Billing | Same period/amount billed multiple times | Critical |
+| R006 | Duplicate Billing | Same period/amount billed multiple times (includes adjacent/overlapping periods, invoice numbers) | Critical |
 | R007 | Billing Outside Term | Invoice period outside contract term | High |
 | R008 | Missing SKU | Invoice references unknown product | Medium |
 | R009 | Currency Mismatch | Invoice currency differs from contract | Medium |
-| R010 | Billing Frequency Mismatch | Invoices don't match contract frequency | Medium |
+| R010 | Billing Frequency Mismatch | Invoices don't match contract frequency (interval-based) | Medium |
+| R017 | Invoice Period Span Mismatch | Invoice service period length doesn't match billing frequency | Medium |
+| R018 | Invoice Timing Variance | Invoice date significantly after expected billing date | Medium |
 
 **Suppression**: R002/R003 are suppressed when R004/R005 fire (specific cause identified).
 
@@ -152,12 +186,13 @@ Snapshot Data → Preprocessor → Rule Registry → Runner → Deduplicator →
 
 ---
 
-## Tier 9: Tax/Fee Exclusion (2 rules)
+## Tier 9: Tax/Fee Exclusion (3 rules)
 
 | Rule ID | Name | Description | Severity |
 |---------|------|-------------|----------|
 | R120 | Unexpected Tax On Exempt | Tax charged to exempt customer | Medium |
 | R121 | Tax Rate Mismatch | Applied tax rate differs from expected | Medium |
+| R122 | Missing Expected Tax | Invoice for taxable customer/jurisdiction has no tax line | High |
 
 ---
 

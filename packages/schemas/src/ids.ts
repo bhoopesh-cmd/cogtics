@@ -1,34 +1,34 @@
 import { z } from 'zod';
 
 // Branded types for type-safe IDs
-declare const brand: unique symbol;
-type Brand<T, B> = T & { readonly [brand]: B };
+// Using nominal typing pattern that works with TypeScript declaration emit
+type Nominal<T, Brand extends string> = T & { readonly __nominal: Brand };
 
-export type TenantId = Brand<string, 'TenantId'>;
-export type UserId = Brand<string, 'UserId'>;
-export type RequestId = Brand<string, 'RequestId'>;
-export type JobId = Brand<string, 'JobId'>;
-export type RoleId = Brand<string, 'RoleId'>;
-export type PermissionId = Brand<string, 'PermissionId'>;
-export type MembershipId = Brand<string, 'MembershipId'>;
-export type AuditLogId = Brand<string, 'AuditLogId'>;
-export type IdempotencyKeyId = Brand<string, 'IdempotencyKeyId'>;
-export type StorageObjectId = Brand<string, 'StorageObjectId'>;
-export type ContractId = Brand<string, 'ContractId'>;
-export type IssueId = Brand<string, 'IssueId'>;
-export type SimulationId = Brand<string, 'SimulationId'>;
-export type SnapshotId = Brand<string, 'SnapshotId'>;
-export type SyncRunId = Brand<string, 'SyncRunId'>;
-export type StagingRecordId = Brand<string, 'StagingRecordId'>;
-export type CustomerId = Brand<string, 'CustomerId'>;
-export type ContractVersionId = Brand<string, 'ContractVersionId'>;
-export type ContractTermId = Brand<string, 'ContractTermId'>;
-export type InvoiceId = Brand<string, 'InvoiceId'>;
-export type InvoiceLineId = Brand<string, 'InvoiceLineId'>;
-export type ProductId = Brand<string, 'ProductId'>;
-export type PaymentId = Brand<string, 'PaymentId'>;
-export type UsageEventId = Brand<string, 'UsageEventId'>;
-export type PricePlanId = Brand<string, 'PricePlanId'>;
+export type TenantId = Nominal<string, 'TenantId'>;
+export type UserId = Nominal<string, 'UserId'>;
+export type RequestId = Nominal<string, 'RequestId'>;
+export type JobId = Nominal<string, 'JobId'>;
+export type RoleId = Nominal<string, 'RoleId'>;
+export type PermissionId = Nominal<string, 'PermissionId'>;
+export type MembershipId = Nominal<string, 'MembershipId'>;
+export type AuditLogId = Nominal<string, 'AuditLogId'>;
+export type IdempotencyKeyId = Nominal<string, 'IdempotencyKeyId'>;
+export type StorageObjectId = Nominal<string, 'StorageObjectId'>;
+export type ContractId = Nominal<string, 'ContractId'>;
+export type IssueId = Nominal<string, 'IssueId'>;
+export type SimulationId = Nominal<string, 'SimulationId'>;
+export type SnapshotId = Nominal<string, 'SnapshotId'>;
+export type SyncRunId = Nominal<string, 'SyncRunId'>;
+export type StagingRecordId = Nominal<string, 'StagingRecordId'>;
+export type CustomerId = Nominal<string, 'CustomerId'>;
+export type ContractVersionId = Nominal<string, 'ContractVersionId'>;
+export type ContractTermId = Nominal<string, 'ContractTermId'>;
+export type InvoiceId = Nominal<string, 'InvoiceId'>;
+export type InvoiceLineId = Nominal<string, 'InvoiceLineId'>;
+export type ProductId = Nominal<string, 'ProductId'>;
+export type PaymentId = Nominal<string, 'PaymentId'>;
+export type UsageEventId = Nominal<string, 'UsageEventId'>;
+export type PricePlanId = Nominal<string, 'PricePlanId'>;
 
 // ID prefix patterns for validation
 const ID_PATTERNS = {

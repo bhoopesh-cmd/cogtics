@@ -1,0 +1,22 @@
+Key gaps vs your rules and production needs
+
+Zod at every boundary: plan doesn’t explicitly verify schema validation on API requests, connector payloads, job inputs/outputs. Add negative tests to confirm rejects on invalid shapes.
+Snapshot ID everywhere: plan doesn’t enforce/verify snapshot scoping in every endpoint, job payload, export, and simulation output.
+Idempotency: no explicit tests for idempotency keys on ingestion/detection/export jobs (replays shouldn’t double‑apply).
+Workers stateless: no test proving workers can restart and resume solely from DB + payload.
+Pure functions: no unit tests to confirm rules/rev‑rec/simulations are deterministic and side‑effect‑free.
+RLS enforcement: mentions RLS but doesn’t include explicit negative cases (cross‑tenant joins, snapshot leakage, export/issue access, audit leakage).
+DLQ/Retry policy: no test for DLQ handling, backoff, or poison‑message behavior.
+Missing production readiness areas
+
+Auth hardening: token expiry/refresh, invalid/expired JWT, API key rotation, CSRF if any cookie auth.
+Connector OAuth: token refresh failure handling, revoked tokens, partial scope failures.
+Backups/restore: no backup/restore or migration rollback test.
+Data retention/PII: no tests for deletion or redaction workflows (if required).
+Rate limiting / abuse: not covered.
+Export integrity: no checksum/hash verification for generated exports or MinIO presign expiry behavior.
+Performance thresholds: present but generic; need SLOs per API endpoint and per queue.
+Items to clarify
+
+/ingestion, /snapshots, /data routes: verify these exist as named; if not, update with actual endpoints.
+Stress test scripts (tools/stress-test/*) are referenced correctly and exist, but the plan doesn’t state how to validate success beyond summary metrics.

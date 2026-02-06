@@ -12,16 +12,23 @@ const BaseEnvSchema = z.object({
 export const ApiEnvSchema = BaseEnvSchema.extend({
   API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   API_HOST: z.string().default('0.0.0.0'),
-  
+
   // Frontend URL (for OAuth redirects in development)
   FRONTEND_URL: z.string().url().optional(),
-  
-  // Auth configuration
-  AUTH_MODE: z.enum(['dev', 'jwt']).default('dev'),
+
+  // CORS configuration (comma-separated origins)
+  ALLOWED_ORIGINS: z.string().optional().default('http://localhost:5173'),
+
+  // Clerk authentication
+  CLERK_PUBLISHABLE_KEY: z.string().optional(),
+  CLERK_SECRET_KEY: z.string().optional(),
+
+  // Auth configuration (dev mode for local development, clerk for production)
+  AUTH_MODE: z.enum(['dev', 'jwt', 'clerk']).default('dev'),
   DEV_USER_ID: z.string().optional(),
   DEV_TENANT_ID: z.string().optional(),
   JWT_SECRET: z.string().optional(),
-  
+
   // S3/MinIO configuration
   S3_ENDPOINT: z.string().url(),
   S3_ACCESS_KEY: z.string().min(1),
@@ -53,7 +60,8 @@ export const ApiEnvSchema = BaseEnvSchema.extend({
 // Worker-specific environment schema
 export const WorkerEnvSchema = BaseEnvSchema.extend({
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(5),
-  
+  WORKER_HEALTH_PORT: z.coerce.number().int().min(1024).max(65535).default(3001),
+
   // S3/MinIO configuration
   S3_ENDPOINT: z.string().url(),
   S3_ACCESS_KEY: z.string().min(1),
@@ -73,15 +81,15 @@ export type WorkerEnv = z.infer<typeof WorkerEnvSchema>;
 // Validation helper with formatted errors
 export function parseEnv<T extends z.ZodSchema>(schema: T, env: NodeJS.ProcessEnv): z.infer<T> {
   const result = schema.safeParse(env);
-  
+
   if (!result.success) {
     const errors = result.error.issues
       .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
       .join('\n');
-    
+
     throw new Error(`Environment validation failed:\n${errors}`);
   }
-  
+
   return result.data;
 }
 

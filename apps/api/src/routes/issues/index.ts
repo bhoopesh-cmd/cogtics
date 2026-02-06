@@ -424,10 +424,10 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: 'Snapshot not found' });
     }
 
-    if (snapshot.status !== 'completed') {
-      return reply.status(400).send({ 
-        error: 'Snapshot must be completed before running detection',
-        status: snapshot.status 
+    if (snapshot.status !== 'complete') {
+      return reply.status(400).send({
+        error: 'Snapshot must be complete before running detection',
+        status: snapshot.status
       });
     }
 

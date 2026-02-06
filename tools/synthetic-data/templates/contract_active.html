@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ contract.name or 'Agreement' }}</title>
+    {% set layout = (contract.metadata.get('layout') if contract.metadata else {}) %}
+    {% set advanced = layout.get('columns') or layout.get('header') or layout.get('footer') or layout.get('exhibit') or layout.get('definitions_table') %}
+    <style>
+        @page {
+            size: letter;
+            margin: 1in;
+        }
+        body {
+            font-family: {{ "Times New Roman, serif" if advanced else "Arial, sans-serif" }};
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #111;
+        }
+        h1 {
+            text-align: center;
+            font-size: 16pt;
+            margin: 0 0 12px 0;
+        }
+        h2 {
+            font-size: 12pt;
+            margin: 18px 0 8px 0;
+        }
+        .header {
+            position: running(header);
+            font-size: 9pt;
+            color: #444;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
+        }
+        .footer {
+            position: running(footer);
+            font-size: 9pt;
+            color: #666;
+        }
+        .parties {
+            margin: 12px 0 16px 0;
+        }
+        .clauses {
+            margin-top: 8px;
+        }
+        .clauses.columns {
+            column-count: 2;
+            column-gap: 24px;
+        }
+        .clause {
+            break-inside: avoid;
+            margin: 0 0 10px 0;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .clause-body {
+            display: inline;
+            white-space: pre-wrap;
+        }
+        .clause-number {
+            font-weight: bold;
+            margin-right: 6px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0 12px 0;
+            font-size: 10pt;
+        }
+        th, td {
+            border: 1px solid #bbb;
+            padding: 6px 8px;
+            text-align: left;
+        }
+        .exhibit {
+            margin-top: 24px;
+        }
+        .signature-block {
+            margin-top: 32px;
+        }
+        .signature-line {
+            border-bottom: 1px solid #000;
+            width: 220px;
+            display: inline-block;
+        }
+        {% if layout.get('header') %}
+        @page {
+            @top-center { content: element(header); }
+        }
+        {% endif %}
+        {% if layout.get('footer') %}
+        @page {
+            @bottom-center { content: "Page " counter(page) " of " counter(pages); }
+        }
+        {% endif %}
+    </style>
+</head>
+<body>
+    {% if layout.get('header') %}
+    <div class="header">{{ contract.name or 'Agreement' }} — {{ contract.id }}</div>
+    {% endif %}
+    {% if layout.get('footer') %}
+    <div class="footer">Confidential</div>
+    {% endif %}
+
+    <h1>{{ contract.name or 'AGREEMENT' }}</h1>
+
+    <div class="parties">
+        <p>This Agreement is entered into as of {{ contract.start_date or 'the Effective Date' }}.</p>
+    </div>
+
+    {% if layout.get('definitions_table') and layout.get('definitions') %}
+    <h2>Definitions</h2>
+    <table>
+        <thead>
+            <tr><th>Term</th><th>Definition</th></tr>
+        </thead>
+        <tbody>
+            {% for row in layout.get('definitions', []) %}
+            <tr><td>{{ row.term }}</td><td>{{ row.definition }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <div class="clauses {% if layout.get('columns') == 2 %}columns{% endif %}">
+        {% for clause in clauses %}
+        <div class="clause">
+            {% if clause.clause_label and layout.get('show_numbering', True) %}
+            <span class="clause-number">{{ clause.clause_label }}.</span>
+            {% endif %}
+            <span class="clause-body">{{ clause.text }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if layout.get('exhibit') %}
+    <div class="exhibit">
+        <h2>Exhibit A — {{ layout.get('exhibit_title', 'Pricing') }}</h2>
+        <table>
+            <thead>
+                <tr><th>Item</th><th>Value</th></tr>
+            </thead>
+            <tbody>
+                {% for row in layout.get('exhibit_rows', []) %}
+                <tr><td>{{ row.item }}</td><td>{{ row.value }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="signature-block">
+        <p>IN WITNESS WHEREOF, the parties have executed this Agreement.</p>
+        <br><br>
+        <p>By: <span class="signature-line"></span> Date: <span class="signature-line"></span></p>
+    </div>
+</body>
+</html>

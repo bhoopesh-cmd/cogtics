@@ -174,7 +174,113 @@ export {
 } from './detection.js';
 
 // Simulation engine schemas (Phase 9)
-export * from './simulation.js';
+// Re-export everything except conflicting names
+export {
+  // ID Types (renamed to avoid conflict with ids.js)
+  type SimulationId as SimulationIdBrand,
+  type SimulationOverrideId,
+  type SimulationRunId,
+  type SimulationResultId,
+  type SimulationDeltaId,
+  type SimulationTemplateId,
+  type SimulationAuditId,
+  // ID Generators
+  generateSimulationId,
+  generateSimulationOverrideId,
+  generateSimulationRunId,
+  generateSimulationResultId,
+  generateSimulationDeltaId,
+  generateSimulationTemplateId,
+  generateSimulationAuditId,
+  // Status enums
+  SimulationStatusSchema,
+  type SimulationStatus,
+  SimulationRunStatusSchema,
+  type SimulationRunStatus,
+  // Override types (renamed to avoid conflict with contracts.js)
+  OverrideTypeSchema as SimulationOverrideTypeSchema,
+  type OverrideType as SimulationOverrideType,
+  TargetTypeSchema,
+  type TargetType,
+  DeltaTypeSchema,
+  type DeltaType,
+  SimulationAuditActionSchema,
+  type SimulationAuditAction,
+  // Override schemas
+  ContractTermOverrideSchema,
+  type ContractTermOverride,
+  UsageAdjustmentOverrideSchema,
+  type UsageAdjustmentOverride,
+  BillingAdjustmentOverrideSchema,
+  type BillingAdjustmentOverride,
+  TimingShiftOverrideSchema,
+  type TimingShiftOverride,
+  DiscountChangeOverrideSchema,
+  type DiscountChangeOverride,
+  PriceChangeOverrideSchema,
+  type PriceChangeOverride,
+  SimulationOverridePayloadSchema,
+  type SimulationOverridePayload,
+  SimulationOverrideSchema,
+  type SimulationOverride,
+  // Simulation schemas
+  SimulationSchema,
+  type Simulation,
+  SimulationWithOverridesSchema,
+  type SimulationWithOverrides,
+  CreateSimulationSchema,
+  type CreateSimulation,
+  UpdateSimulationSchema,
+  type UpdateSimulation,
+  // Run schemas
+  SimulationRunSchema,
+  type SimulationRun,
+  // Result schemas
+  SimulationResultSchema,
+  type SimulationResult,
+  SimulationDeltaSchema,
+  type SimulationDelta,
+  // Template schemas
+  SimulationTemplateSchema,
+  type SimulationTemplate,
+  // Audit schemas
+  SimulationAuditSchema,
+  type SimulationAudit,
+  // Query schemas
+  SimulationListQuerySchema,
+  type SimulationListQuery,
+  SimulationRunListQuerySchema,
+  type SimulationRunListQuery,
+  SimulationDeltasQuerySchema,
+  type SimulationDeltasQuery,
+  TemplateListQuerySchema,
+  type TemplateListQuery,
+  // Request schemas
+  AddOverrideSchema,
+  type AddOverride,
+  RunSimulationSchema,
+  type RunSimulationRequest,
+  CreateTemplateSchema,
+  type CreateTemplate,
+  ApplyTemplateSchema,
+  type ApplyTemplate,
+  // Job payloads
+  SimulationRunJobPayloadSchema,
+  type SimulationRunJobPayload,
+  SimulationReplayJobPayloadSchema,
+  type SimulationReplayJobPayload,
+  // Engine types
+  SimulationContextSchema,
+  type SimulationContext,
+  SimulationWarningSchema,
+  type SimulationWarning,
+  SimulationSummarySchema,
+  type SimulationSummary,
+  DeltaRecordSchema,
+  type DeltaRecord,
+  SimulationEngineResultSchema,
+  type SimulationEngineResult,
+} from './simulation.js';
 
 // Exports & Digests schemas (Phase 10)
 export * from './exports.js';

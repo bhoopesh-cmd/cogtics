@@ -39,6 +39,8 @@ import { DigestSettingsPage } from '@/features/digests';
 // Phase 11 pages
 import { DLQPage } from '@/features/admin/DLQPage';
 import { SystemHealthPage } from '@/features/admin/SystemHealthPage';
+// AI Feature pages (detail pages only - lists integrated into Simulations)
+import { RecommendationDetailPage } from '@/features/ai';
 
 function ProtectedRoutes() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -90,17 +92,24 @@ function ProtectedRoutes() {
         <Route path="/contracts/review" element={<ReviewQueuePage />} />
         {/* Phase 6 Revenue Recognition Routes */}
         <Route path="/revrec" element={<RevRecDashboardPage />} />
+        {/* AI Recommendation detail page - list integrated into Simulations */}
+        <Route path="/ai/recommendations/:id" element={<RecommendationDetailPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>
   );
 }
 
+import { SignUpPage } from '@/features/auth/SignUpPage';
+
+// ... (existing imports)
+
 export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<DevLoginPage />} />
+        <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/*" element={<ProtectedRoutes />} />
       </Routes>
     </BrowserRouter>

@@ -69,10 +69,9 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  // Detailed health check with queue info (Phase 11)
+  // Detailed health check with queue info (Phase 2 Enhanced)
   fastify.get('/health/detailed', async (request, reply) => {
     const checks: Record<string, { status: boolean; latencyMs?: number }> = {};
-    const queueInfo: Record<string, { depth: number; oldestJobAge?: number }> = {};
 
     // Check database with latency
     const dbStart = Date.now();
@@ -105,18 +104,21 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
       checks['storage'] = { status: false, latencyMs: Date.now() - storageStart };
     }
 
-    // Get queue depths from jobs table
-    try {
-      const queueCounts = await fastify.db
-        .selectFrom('jobs')
-        .select(['type'])
-        .select((eb) => eb.fn.count<number>('id').as('count'))
-        .where('status', 'in', ['pending', 'processing'])
-        .groupBy('type')
-        .execute();
+    // Phase 2: Enhanced queue monitoring with utilization
+    const { getQueueStatus, getAllQueueDepths } = await import('../lib/queue-depth.js');
+    let queueStatus: Awaited<ReturnType<typeof getQueueStatus>> = [];
+    let queueDepths: Record<string, number> = {};
+    let overallQueueStatus: 'healthy' | 'warning' | 'critical' = 'healthy';
 
-      for (const q of queueCounts) {
-        queueInfo[q.type] = { depth: Number(q.count) };
+    try {
+      queueStatus = await getQueueStatus(fastify);
+      queueDepths = await getAllQueueDepths(fastify);
+
+      // Determine overall queue status
+      if (queueStatus.some(q => q.status === 'critical')) {
+        overallQueueStatus = 'critical';
+      } else if (queueStatus.some(q => q.status === 'warning')) {
+        overallQueueStatus = 'warning';
       }
     } catch {
       // Ignore queue check errors
@@ -136,12 +138,20 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const allHealthy = Object.values(checks).every((c) => c.status);
-    const status = allHealthy ? 'healthy' : 'degraded';
+    const systemStatus =
+      !allHealthy ? 'degraded' :
+      overallQueueStatus === 'critical' ? 'degraded' :
+      overallQueueStatus === 'warning' ? 'healthy' :
+      'healthy';
 
     return {
-      status,
+      status: systemStatus,
       checks,
-      queues: queueInfo,
+      queues: {
+        depths: queueDepths,
+        status: queueStatus,
+        overallStatus: overallQueueStatus,
+      },
       dlq: { totalCount: dlqCount },
       version: process.env['npm_package_version'] || '0.0.0',
       uptime: Math.floor((Date.now() - startTime) / 1000),

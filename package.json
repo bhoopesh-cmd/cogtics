@@ -20,14 +20,23 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "typecheck": "pnpm run -r typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "validate": "tsx tools/validation/run-validation.ts",
+    "validate:detection": "tsx tools/validation/detection-validator.ts",
+    "validate:tenants": "tsx tools/validation/tenant-isolation-test.ts",
+    "validate:resilience": "tsx tools/validation/resilience-test.ts",
+    "validate:security": "tsx tools/validation/security-test.ts",
+    "validate:all": "pnpm validate && pnpm validate:detection && pnpm validate:tenants && pnpm validate:resilience && pnpm validate:security"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.1",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
     "@vitest/coverage-v8": "^4.0.16",
     "concurrently": "^8.2.2",
+    "dotenv": "^17.2.3",
     "eslint": "^8.55.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.1.0",
@@ -37,5 +46,8 @@
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=8.0.0"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
   }
 }

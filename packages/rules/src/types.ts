@@ -359,3 +359,179 @@ export interface DeduplicationResult {
     duplicate: RuleIssue;
   }>;
 }
+
+// ============================================
+// AI Enrichment Types (Tier 2)
+// ============================================
+
+export interface AIEnrichedIssue extends RuleIssue {
+  /** AI-generated analysis */
+  aiAnalysis: {
+    /** Root cause explanation */
+    rootCause: string;
+    /** Business impact description */
+    businessImpact: string;
+    /** Suggested corrective action */
+    suggestedFix: string;
+    /** AI confidence in analysis (0-1) */
+    confidence: number;
+    /** Related issue IDs (issue keys) */
+    relatedIssueIds: string[];
+    /** Plain-language explanation */
+    explanation: string;
+    /** AI-assessed priority */
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    /** Classification tags */
+    tags: string[];
+  };
+  /** Unique issue key */
+  issueKey: string;
+  /** When AI enrichment occurred */
+  aiEnrichedAt: Date;
+}
+
+// ============================================
+// AI Discovered Issues Types (Tier 3)
+// ============================================
+
+export interface AIDiscoveredIssue {
+  /** Unique ID */
+  id: string;
+  /** Category of AI discovery */
+  category: 'semantic' | 'pattern' | 'anomaly' | 'contextual';
+  /** Severity assessment */
+  severity: IssueSeverity;
+  /** AI confidence (0-1) */
+  confidence: number;
+  /** Issue title */
+  title: string;
+  /** Detailed description */
+  description: string;
+  /** Evidence supporting discovery */
+  evidence: {
+    /** Related contract IDs */
+    contractIds: string[];
+    /** Related invoice IDs */
+    invoiceIds: string[];
+    /** Relevant field values */
+    relevantFields: Record<string, unknown>;
+  };
+  /** AI reasoning for detection */
+  reasoning: string;
+  /** Always requires human review */
+  requiresReview: true;
+  /** Review status */
+  reviewStatus?: 'pending' | 'confirmed' | 'dismissed';
+  /** User who reviewed */
+  reviewedBy?: string;
+  /** When reviewed */
+  reviewedAt?: Date;
+  /** If promoted, the issue ID */
+  promotedToIssueId?: string;
+}
+
+// ============================================
+// AI Recommendation Types (Tier 4)
+// ============================================
+
+export interface AIRecommendation {
+  /** Unique ID */
+  id: string;
+  /** Related issue IDs */
+  issueIds: string[];
+  /** Priority level */
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  /** Recommendation title */
+  title: string;
+  /** Detailed description */
+  description: string;
+  /** Estimated financial impact */
+  estimatedImpact: {
+    /** Revenue change amount */
+    revenueChange: number;
+    /** Currency */
+    currency: string;
+    /** Confidence in estimate */
+    confidence: number;
+  };
+  /** Suggested simulation configuration */
+  suggestedSimulation: {
+    /** Simulation overrides */
+    overrides: SimulationOverride[];
+    /** Description of simulation */
+    description: string;
+  };
+  /** Effort level */
+  effort: 'low' | 'medium' | 'high';
+  /** AI reasoning */
+  reasoning: string;
+  /** Status */
+  status?: 'pending' | 'accepted' | 'dismissed' | 'simulated' | 'applied';
+  /** Related simulation ID if created */
+  simulationId?: string;
+  /** When created */
+  createdAt?: Date;
+}
+
+export interface SimulationOverride {
+  /** Override type */
+  type: 'contract_term' | 'price_change' | 'timing_shift' | 'discount_change' | 'billing_adjustment';
+  /** Target entity ID (contract or invoice) */
+  targetId: string;
+  /** Field to override */
+  field: string;
+  /** Original value */
+  originalValue: unknown;
+  /** New value */
+  newValue: unknown;
+  /** Effective date */
+  effectiveDate?: string;
+  /** Description */
+  description?: string;
+}
+
+// ============================================
+// AI Detection Configuration Types
+// ============================================
+
+export interface AIEnrichmentConfig {
+  /** Enable AI enrichment */
+  enabled: boolean;
+  /** Max issues to enrich per run */
+  maxIssuesPerRun: number;
+  /** Min confidence threshold to enrich */
+  minConfidenceToEnrich: number;
+  /** Include fix recommendations */
+  includeRecommendations: boolean;
+}
+
+export interface AIAnomalyDetectionConfig {
+  /** Enable anomaly detection */
+  enabled: boolean;
+  /** Min confidence to report anomalies */
+  minConfidenceToReport: number;
+  /** Max anomalies to report per run */
+  maxAnomaliesPerRun: number;
+  /** Enabled categories */
+  categories: Array<'semantic' | 'pattern' | 'anomaly' | 'contextual'>;
+}
+
+export interface LLMCostControlsConfig {
+  /** Max cost per run in USD */
+  maxCostPerRunUsd: number;
+  /** Preferred model */
+  preferredModel: 'gpt-4o' | 'gpt-4o-mini';
+  /** Enable response caching */
+  enableCaching: boolean;
+  /** Budget alert threshold in USD */
+  budgetAlertThresholdUsd?: number;
+}
+
+export interface AIDetectionConfig {
+  /** Tier 2: AI Enrichment */
+  aiEnrichment?: AIEnrichmentConfig;
+  /** Tier 3: AI Anomaly Detection */
+  aiAnomalyDetection?: AIAnomalyDetectionConfig;
+  /** Cost controls */
+  llmCostControls?: LLMCostControlsConfig;
+}

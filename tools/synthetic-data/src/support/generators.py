@@ -81,6 +81,13 @@ class FakerSupport:
         company = self.fake.company()
         domain = company.lower().replace(" ", "").replace(",", "")[:20]
         
+        # Generate jurisdiction for tax detection (R122)
+        jurisdiction = self.fake.random_element([
+            "US-CA", "US-NY", "US-TX", "US-FL", "US-WA",
+            "UK", "DE", "FR", "AU", "CA"
+        ])
+        country = jurisdiction.split("-")[0] if "-" in jurisdiction else jurisdiction
+        
         return {
             **self.generate_ids("cus_"),
             "name": company,
@@ -89,6 +96,8 @@ class FakerSupport:
             "metadata": {
                 "industry": self.fake.bs(),
                 "size": self.fake.random_element(["small", "medium", "large", "enterprise"]),
+                "jurisdiction": jurisdiction,
+                "country": country,
             },
             "source_system": "synthetic",
         }

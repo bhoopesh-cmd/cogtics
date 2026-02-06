@@ -53,17 +53,19 @@ export function Sidebar() {
   useEffect(() => {
     const fetchBadges = async () => {
       try {
-        const summary = await getIssueSummary();
+        const issueSummary = await getIssueSummary();
+        
         // Count open issues (not resolved, not dismissed)
-        const openCount = (summary.byStatus?.['open'] ?? 0) + 
-                         (summary.byStatus?.['investigating'] ?? 0) + 
-                         (summary.byStatus?.['confirmed'] ?? 0);
+        const openCount = (issueSummary.byStatus?.['open'] ?? 0) + 
+                         (issueSummary.byStatus?.['investigating'] ?? 0) + 
+                         (issueSummary.byStatus?.['confirmed'] ?? 0);
+        
         setBadges({
           openIssues: openCount > 0 ? String(openCount) : null,
         });
       } catch (err) {
         // Silently fail - badge will just not show
-        console.debug('Failed to fetch issue count:', err);
+        console.debug('Failed to fetch badge counts:', err);
       }
     };
 

@@ -215,35 +215,51 @@ export const R104_FXRateUnavailable: Rule = {
 // R105: Missing Master Data
 export const R105_MissingMasterData: Rule = {
   id: 'R105',
-  version: '1.0.0',
+  version: '1.1.0',
   name: 'Missing Master Data',
-  description: 'Required master data (customer, product) is missing',
+  description: 'Required master data (customer, product, contract) is missing',
   category: 'data_quality',
   tier: 'data_quality',
-  severity: 'low',
+  severity: 'medium',
   priority: 6,
   requiresData: ['contracts', 'invoices', 'customers', 'products'],
   enabled: true,
   run: (ctx: RuleContext): RuleIssue[] => {
-    const { dataQuality, snapshotId } = ctx;
+    const { invoices, snapshotId } = ctx;
     const issues: RuleIssue[] = [];
 
-    for (const warning of dataQuality.missingMasterData) {
-      issues.push({
-        ruleId: 'R105',
-        ruleVersion: '1.0.0',
-        category: 'data_quality',
-        severity: 'low',
-        confidence: 1.0,
-        expected: { masterDataComplete: true },
-        actual: { masterDataComplete: false, warning },
-        dimensions: { 
-          snapshotId, 
-          type: 'missing_master_data',
-          warning,
-        },
-        dataQualityFlags: ['missing_master_data'],
-      });
+    // Check for orphan invoices (no contract_id)
+    for (const invoice of invoices) {
+      if (!invoice.contract_id) {
+        issues.push({
+          ruleId: 'R105',
+          ruleVersion: '1.1.0',
+          category: 'data_quality',
+          severity: 'medium',
+          confidence: 1.0,
+          impactAmount: invoice.total,
+          currency: invoice.currency,
+          expected: { hasContractId: true },
+          actual: { hasContractId: false },
+          dimensions: { 
+            snapshotId, 
+            invoiceId: invoice.id,
+            type: 'orphan_invoice',
+          },
+          invoiceId: invoice.id,
+          customerId: invoice.customer_id || undefined,
+          sources: [{
+            sourceType: 'invoice',
+            sourceId: invoice.id,
+            sourceSystem: invoice.source_system,
+          }],
+          dataQualityFlags: ['missing_master_data', 'orphan_invoice'],
+          metadata: {
+            invoiceNumber: invoice.invoice_number,
+            invoiceDate: invoice.invoice_date,
+          },
+        });
+      }
     }
 
     return issues;

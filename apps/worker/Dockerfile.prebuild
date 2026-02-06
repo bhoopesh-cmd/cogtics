@@ -1,0 +1,55 @@
+# Stage 1: Builder
+FROM node:20-alpine AS builder
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# Copy workspace files
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages packages/
+COPY apps/worker apps/worker/
+
+# Fix package.json exports to point to dist instead of src for production
+# Alpine sed requires different syntax - use perl-style regex or multiple commands
+RUN find packages -type f -name "package.json" | while read f; do \
+  sed -i 's|"import": "./src/index.ts"|"import": "./dist/index.js"|g' "$f" && \
+  sed -i 's|"types": "./src/index.ts"|"types": "./dist/index.d.ts"|g' "$f" && \
+  sed -i 's|"main": "./src/index.ts"|"main": "./dist/index.js"|g' "$f"; \
+  done
+
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
+
+# Stage 2: Runner
+FROM node:20-alpine
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# Copy built artifacts from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/worker ./apps/worker
+COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder /app/package.json ./package.json
+
+# Set working directory to worker
+WORKDIR /app/apps/worker
+
+# Environment
+ENV NODE_ENV=production
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+
+# Expose health check port
+EXPOSE 3001
+
+# Start worker
+CMD ["pnpm", "start"]

@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cogtics"]
+      test: [ "CMD-SHELL", "pg_isready -U cogtics" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -28,7 +28,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -47,7 +47,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -83,19 +83,19 @@ services:
   # =====================================================
   # Phase 11: Observability Stack
   # =====================================================
-  
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: cogtics-otel-collector
     restart: unless-stopped
-    command: ["--config=/etc/otelcol/config.yaml"]
+    command: [ "--config=/etc/otelcol/config.yaml" ]
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "8888:8888"   # Prometheus metrics exposed by the collector
-      - "8889:8889"   # Prometheus exporter metrics
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8888:8888" # Prometheus metrics exposed by the collector
+      - "8889:8889" # Prometheus exporter metrics
     depends_on:
       - prometheus
       - loki
@@ -131,14 +131,14 @@ services:
     image: grafana/tempo:latest
     container_name: cogtics-tempo
     restart: unless-stopped
-    command: ["-config.file=/etc/tempo.yaml"]
+    command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./tempo.yaml:/etc/tempo.yaml:ro
       - tempo_data:/tmp/tempo
     ports:
-      - "3200:3200"   # tempo
-      - "9095:9095"   # tempo grpc
-      - "4319:4317"   # otlp grpc (different host port to avoid conflict)
+      - "3200:3200" # tempo
+      - "9095:9095" # tempo grpc
+      - "4319:4317" # otlp grpc (different host port to avoid conflict)
 
   grafana:
     image: grafana/grafana:latest
@@ -154,11 +154,123 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - "3001:3000"
+      - "3002:3000"
     depends_on:
       - prometheus
       - loki
       - tempo
+
+  # =====================================================
+  # Phase 3: Horizontal Worker Scaling
+  # =====================================================
+
+  worker-1:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    container_name: cogtics-worker-1
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://cogtics:cogtics@postgres:5432/cogtics
+      REDIS_URL: redis://redis:6379
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-15}
+      WORKER_HEALTH_PORT: 3001
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-cogtics}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      TOKEN_ENCRYPTION_MODE: ${TOKEN_ENCRYPTION_MODE:-local}
+    ports:
+      - "3011:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
+  worker-2:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    container_name: cogtics-worker-2
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://cogtics:cogtics@postgres:5432/cogtics
+      REDIS_URL: redis://redis:6379
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-15}
+      WORKER_HEALTH_PORT: 3001
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-cogtics}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      TOKEN_ENCRYPTION_MODE: ${TOKEN_ENCRYPTION_MODE:-local}
+    ports:
+      - "3012:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
+  worker-3:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    container_name: cogtics-worker-3
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://cogtics:cogtics@postgres:5432/cogtics
+      REDIS_URL: redis://redis:6379
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-15}
+      WORKER_HEALTH_PORT: 3001
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-cogtics}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      TOKEN_ENCRYPTION_MODE: ${TOKEN_ENCRYPTION_MODE:-local}
+    ports:
+      - "3013:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
 
 volumes:
   postgres_data:
@@ -169,4 +281,5 @@ volumes:
   loki_data:
   tempo_data:
   grafana_data:
+
 

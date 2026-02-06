@@ -37,6 +37,10 @@ docker/data/
 # Repo-specific
 .website/
 .playwright-mcp/
+.agent/
+.cursor/
+playwright-report/
+test-results-run*/
 
 # Caches
 .eslintcache

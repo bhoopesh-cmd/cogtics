@@ -229,3 +229,20 @@ export function getRowSchemaForEntity(entityType: UploadEntityType) {
       return z.record(z.unknown());
   }
 }
+
+// ============================================
+// Error Response Schemas (Phase 2)
+// ============================================
+
+/**
+ * HTTP 429 Response when queue is full (backpressure)
+ */
+export const UploadQueueFullErrorSchema = z.object({
+  error: z.literal('Too Many Requests'),
+  message: z.string(),
+  retryAfter: z.number().optional(),
+  queueDepth: z.number(),
+  queueLimit: z.number(),
+});
+
+export type UploadQueueFullError = z.infer<typeof UploadQueueFullErrorSchema>;

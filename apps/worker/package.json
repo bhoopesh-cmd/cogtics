@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/bootstrap.ts",
-    "start": "node dist/worker.js",
+    "start": "node dist/bootstrap.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },

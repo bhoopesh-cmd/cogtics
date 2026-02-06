@@ -88,14 +88,20 @@ class PDFExporter:
             template = self._jinja_env.get_template(template_name)
         except:
             template = self._get_default_contract_template()
-        
+
+        # Extract layout metadata from contract
+        layout = {}
+        if hasattr(contract, 'metadata') and contract.metadata:
+            layout = contract.metadata.get('layout', {})
+
         # Render HTML
         html_content = template.render(
             contract=contract,
             clauses=clauses,
+            layout=layout,
             generation_date=date.today().isoformat(),
         )
-        
+
         # Generate PDF
         return self._render_pdf(html_content, output_path)
     
@@ -223,41 +229,156 @@ class PDFExporter:
         return output_path
     
     def _get_default_contract_template(self):
-        """Get default contract HTML template."""
+        """Get default contract HTML template with layout support."""
         html = """
 <!DOCTYPE html>
-<html>
+<html lang="{{ layout.language|default('en') }}">
 <head>
+    <meta charset="UTF-8">
     <title>{{ contract.name or 'Agreement' }}</title>
     <style>
-        body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; }
-        h1 { text-align: center; font-size: 16pt; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC&family=Noto+Sans+JP&display=swap');
+
+        body {
+            font-family: {{ layout.font_family|default('Arial') }}, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            direction: {{ layout.text_direction|default('ltr') }};
+        }
+        h1 { text-align: center; font-size: 16pt; margin-bottom: 20px; }
+
+        /* Header and Footer */
+        .doc-header {
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: {% if layout.header %}block{% else %}none{% endif %};
+        }
+        .doc-header .logo { font-weight: bold; font-size: 14pt; }
+        .doc-header .doc-info { float: right; text-align: right; font-size: 9pt; }
+
+        .doc-footer {
+            border-top: 1px solid #999;
+            padding-top: 10px;
+            margin-top: 30px;
+            font-size: 9pt;
+            color: #666;
+            display: {% if layout.footer %}block{% else %}none{% endif %};
+        }
+
+        /* Multi-column layout */
+        .content {
+            {% if layout.columns == 2 %}
+            column-count: 2;
+            column-gap: 30px;
+            column-rule: 1px solid #ddd;
+            {% endif %}
+        }
+
         .parties { margin: 20px 0; }
-        .clause { margin: 15px 0; }
+        .clause { margin: 15px 0; break-inside: avoid; }
         .clause-title { font-weight: bold; }
-        .signature-block { margin-top: 50px; }
+
+        /* Exhibit table */
+        .exhibit {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #333;
+            background: #f9f9f9;
+            break-inside: avoid;
+            display: {% if layout.exhibit %}block{% else %}none{% endif %};
+        }
+        .exhibit h3 { margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .exhibit table { width: 100%; border-collapse: collapse; }
+        .exhibit th, .exhibit td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .exhibit th { background: #eee; font-weight: bold; }
+
+        /* Definitions table */
+        .definitions-table {
+            margin: 20px 0;
+            display: {% if layout.definitions_table %}block{% else %}none{% endif %};
+        }
+        .definitions-table table { width: 100%; border-collapse: collapse; }
+        .definitions-table th, .definitions-table td {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            vertical-align: top;
+        }
+        .definitions-table th { background: #f0f0f0; width: 25%; }
+
+        .signature-block { margin-top: 50px; break-inside: avoid; }
         .signature-line { border-bottom: 1px solid black; width: 200px; display: inline-block; }
+
+        /* Language-specific styling */
+        .lang-ja, .lang-zh { font-size: 10.5pt; }
     </style>
 </head>
-<body>
+<body class="lang-{{ layout.language|default('en') }}">
+    {% if layout.header %}
+    <div class="doc-header">
+        <span class="logo">{{ contract.name or 'Agreement' }}</span>
+        <div class="doc-info">
+            Document ID: {{ contract.id|default('N/A') }}<br>
+            Generated: {{ generation_date }}
+        </div>
+        <div style="clear: both;"></div>
+    </div>
+    {% endif %}
+
     <h1>{{ contract.name or 'AGREEMENT' }}</h1>
-    
+
     <div class="parties">
-        <p>This Agreement is entered into as of {{ contract.start_date or 'the Effective Date' }}.</p>
+        <p>{{ layout.agreement_intro|default('This Agreement is entered into as of') }} {{ contract.start_date or 'the Effective Date' }}.</p>
     </div>
-    
-    {% for clause in clauses %}
-    <div class="clause">
-        <span class="clause-title">{{ clause.clause_label }}. </span>
-        {{ clause.text }}
+
+    {% if layout.definitions_table and layout.definitions %}
+    <div class="definitions-table">
+        <h3>{{ layout.definitions_title|default('Key Terms') }}</h3>
+        <table>
+            <tr><th>Term</th><th>Definition</th></tr>
+            {% for def in layout.definitions %}
+            <tr><td><strong>"{{ def.term }}"</strong></td><td>{{ def.definition }}</td></tr>
+            {% endfor %}
+        </table>
     </div>
-    {% endfor %}
-    
+    {% endif %}
+
+    <div class="content">
+        {% for clause in clauses %}
+        <div class="clause">
+            <span class="clause-title">{% if layout.section_prefix %}{{ layout.section_prefix }} {% endif %}{{ clause.clause_label }}. </span>
+            {{ clause.text }}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if layout.exhibit and layout.exhibit_rows %}
+    <div class="exhibit">
+        <h3>Exhibit A: {{ layout.exhibit_title|default('Schedule') }}</h3>
+        <table>
+            <tr><th>Item</th><th>Value</th></tr>
+            {% for row in layout.exhibit_rows %}
+            <tr><td>{{ row.item }}</td><td>{{ row.value }}</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
+
     <div class="signature-block">
-        <p>IN WITNESS WHEREOF, the parties have executed this Agreement.</p>
+        <p>{{ layout.witness_clause|default('IN WITNESS WHEREOF, the parties have executed this Agreement.') }}</p>
         <br><br>
-        <p>By: <span class="signature-line"></span> Date: <span class="signature-line"></span></p>
+        <p>{{ layout.signature_line|default('By:') }} <span class="signature-line"></span> {{ layout.date_line|default('Date:') }} <span class="signature-line"></span></p>
     </div>
+
+    {% if layout.footer %}
+    <div class="doc-footer">
+        <p>Confidential - {{ contract.name }} | Page 1 | {{ generation_date }}</p>
+    </div>
+    {% endif %}
 </body>
 </html>
 """

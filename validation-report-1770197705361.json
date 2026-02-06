@@ -1,0 +1,114 @@
+{
+  "timestamp": "2026-02-04T09:35:05.361Z",
+  "environment": {
+    "apiUrl": "http://localhost:3000",
+    "workerUrls": [
+      "http://localhost:3011",
+      "http://localhost:3012",
+      "http://localhost:3013"
+    ]
+  },
+  "checks": [
+    {
+      "name": "API Health",
+      "status": "pass",
+      "message": "API is healthy",
+      "duration": 129
+    },
+    {
+      "name": "Worker Health (http://localhost:3011)",
+      "status": "pass",
+      "message": "Worker is healthy",
+      "duration": 10
+    },
+    {
+      "name": "Worker Health (http://localhost:3012)",
+      "status": "pass",
+      "message": "Worker is healthy",
+      "duration": 9
+    },
+    {
+      "name": "Worker Health (http://localhost:3013)",
+      "status": "pass",
+      "message": "Worker is healthy",
+      "duration": 15
+    },
+    {
+      "name": "Database Connection",
+      "status": "pass",
+      "message": "Connected",
+      "duration": 73
+    },
+    {
+      "name": "Redis Connection",
+      "status": "pass",
+      "message": "Connected",
+      "duration": 39
+    },
+    {
+      "name": "MinIO Connection",
+      "status": "pass",
+      "message": "Connected",
+      "duration": 108
+    },
+    {
+      "name": "Synthetic Data",
+      "status": "pass",
+      "message": "All required files present"
+    },
+    {
+      "name": "Issues API",
+      "status": "pass",
+      "message": "Status: 200",
+      "duration": 19
+    },
+    {
+      "name": "Contracts API",
+      "status": "pass",
+      "message": "Status: 404",
+      "duration": 5
+    },
+    {
+      "name": "Uploads API",
+      "status": "pass",
+      "message": "Status: 200",
+      "duration": 33
+    },
+    {
+      "name": "Connections API",
+      "status": "pass",
+      "message": "Status: 200",
+      "duration": 8
+    },
+    {
+      "name": "Simulations API",
+      "status": "pass",
+      "message": "Status: 200",
+      "duration": 9
+    },
+    {
+      "name": "Exports API",
+      "status": "pass",
+      "message": "Status: 200",
+      "duration": 30
+    },
+    {
+      "name": "RevRec API",
+      "status": "pass",
+      "message": "Status: 200",
+      "duration": 22
+    },
+    {
+      "name": "Snapshots API",
+      "status": "pass",
+      "message": "Status: 200",
+      "duration": 7
+    }
+  ],
+  "summary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0,
+    "skipped": 0
+  }
+}

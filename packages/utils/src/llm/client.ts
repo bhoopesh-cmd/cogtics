@@ -6,6 +6,12 @@
  */
 
 import type { TermType, ExtractedTerm } from '../contracts/extraction.js';
+import {
+  ExtractTermsResponseSchema,
+  ConflictResolutionSchema,
+  DetectOverrideResponseSchema,
+  safeParseLLMResponse,
+} from './schemas.js';
 
 // OpenAI types (simplified - actual types would come from openai package)
 interface OpenAIMessage {
@@ -116,13 +122,9 @@ Return JSON with format: { "extractions": [...] }`;
 
     const response = await this.complete(systemPrompt, userPrompt, { json: true });
     
-    try {
-      const parsed = JSON.parse(response);
-      return (parsed.extractions || []) as LLMExtraction[];
-    } catch {
-      console.warn('Failed to parse LLM extraction response');
-      return [];
-    }
+    // Validate response with Zod schema
+    const parsed = safeParseLLMResponse(ExtractTermsResponseSchema, response, { extractions: [] });
+    return (parsed?.extractions || []) as LLMExtraction[];
   }
 
   /**
@@ -168,24 +170,16 @@ Return JSON with the resolution.`;
 
     const response = await this.complete(systemPrompt, userPrompt, { json: true });
     
-    try {
-      const parsed = JSON.parse(response);
-      return {
-        winningTermIndex: parsed.winningTermIndex ?? 0,
-        reasoning: parsed.reasoning ?? 'Unable to determine',
-        confidence: parsed.confidence ?? 0.5,
-        appliedRules: parsed.appliedRules ?? [],
-        suggestedAction: parsed.suggestedAction ?? 'review',
-      };
-    } catch {
-      return {
-        winningTermIndex: 0,
-        reasoning: 'Failed to parse LLM response',
-        confidence: 0.1,
-        appliedRules: [],
-        suggestedAction: 'review',
-      };
-    }
+    // Validate response with Zod schema
+    const fallback: ConflictResolution = {
+      winningTermIndex: 0,
+      reasoning: 'Failed to parse LLM response',
+      confidence: 0.1,
+      appliedRules: [],
+      suggestedAction: 'review',
+    };
+    const parsed = safeParseLLMResponse(ConflictResolutionSchema, response, fallback);
+    return parsed || fallback;
   }
 
   /**
@@ -245,19 +239,16 @@ Return JSON with format: { "overrides": [{ "type": "...", "matchedText": "...", 
 
     const response = await this.complete(systemPrompt, userPrompt, { json: true });
     
-    try {
-      const parsed = JSON.parse(response);
-      return (parsed.overrides || []).map((o: any, i: number) => ({
-        type: o.type || 'controls',
-        matchedText: o.matchedText || '',
-        targetSection: o.targetSection,
-        confidence: o.confidence || 0.7,
-        startOffset: text.indexOf(o.matchedText || ''),
-        endOffset: text.indexOf(o.matchedText || '') + (o.matchedText?.length || 0),
-      }));
-    } catch {
-      return [];
-    }
+    // Validate response with Zod schema
+    const parsed = safeParseLLMResponse(DetectOverrideResponseSchema, response, { overrides: [] });
+    return (parsed?.overrides || []).map((o) => ({
+      type: o.type || 'controls',
+      matchedText: o.matchedText || '',
+      targetSection: o.targetSection,
+      confidence: o.confidence || 0.7,
+      startOffset: text.indexOf(o.matchedText || ''),
+      endOffset: text.indexOf(o.matchedText || '') + (o.matchedText?.length || 0),
+    }));
   }
 
   /**
