@@ -42,6 +42,14 @@ docker/data/
 playwright-report/
 test-results-run*/
 
+# Local datasets (downloaded on demand)
+CUAD_v1/
+
+# Generated validation/test artifacts
+validation-*.json
+resilience-test-*.json
+*.resolved
+
 # Caches
 .eslintcache
 .cache/
