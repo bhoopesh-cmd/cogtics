@@ -56,8 +56,11 @@ pnpm db:seed
 ### 5. Start Development Servers
 
 ```bash
-# Start API and Worker (with Docker infra)
+# Start API + web (with Docker infra)
 pnpm dev
+
+# In a second terminal, start the background worker
+pnpm dev:worker
 
 # Or start individually:
 pnpm dev:api    # API only
@@ -125,15 +128,18 @@ pnpm format
 .
 ├── apps/
 │   ├── api/           # Fastify API server
+│   ├── web/           # React + Vite frontend
 │   └── worker/        # BullMQ job processor
 ├── packages/
+│   ├── connectors/    # External provider connectors
 │   ├── db/            # Kysely client + migrations
+│   ├── revrec/        # ASC 606 revenue recognition
+│   ├── rules/         # Detection rules
 │   ├── schemas/       # Zod validation schemas
 │   └── utils/         # Shared utilities
 ├── docker/
 │   └── docker-compose.yml
-├── docs/              # Documentation
-└── SaaS/saas-app/     # React frontend
+└── docs/              # Documentation
 ```
 
 ## Troubleshooting
