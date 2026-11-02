@@ -16,10 +16,17 @@ module.exports = {
     es2022: true,
   },
   rules: {
-    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+    ],
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
     'no-console': ['warn', { allow: ['warn', 'error'] }],
+    'no-useless-escape': 'warn',
+    'prefer-const': 'warn',
+    'no-constant-condition': 'warn',
+    'no-control-regex': 'warn',
   },
   ignorePatterns: ['node_modules', 'dist', '*.js'],
 };

@@ -20,6 +20,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "typecheck": "pnpm run -r typecheck",
     "test": "vitest run",
+    "test:unit": "vitest run --exclude \"apps/api/tests/**\"",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "validate": "tsx tools/validation/run-validation.ts",
