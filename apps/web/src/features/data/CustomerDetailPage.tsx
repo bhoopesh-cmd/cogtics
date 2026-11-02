@@ -13,6 +13,7 @@ import {
   Tag,
   ExternalLink,
   RefreshCw,
+  type LucideIcon,
 } from 'lucide-react';
 import { getCustomerDetail, type Customer, type Contract, type Invoice, type Payment } from '@/lib/api/endpoints';
 import DecorativeDots from '@/components/ui/DecorativeDots';
@@ -224,7 +225,7 @@ export function CustomerDetailPage() {
   );
 }
 
-function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ size: number; className?: string }>; label: string; value: string }) {
+function InfoRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3">
       <Icon size={14} className="text-zinc-500" />

@@ -2469,7 +2469,7 @@ export interface EstimatedImpact {
   timeHorizon?: string;
 }
 
-export interface SimulationOverride {
+export interface RecommendationSimulationOverride {
   type: string;
   targetId: string;
   field: string;
@@ -2491,7 +2491,7 @@ export interface AIRecommendation {
   estimatedImpact: EstimatedImpact;
   suggestedSimulation: {
     description?: string;
-    overrides: SimulationOverride[];
+    overrides: RecommendationSimulationOverride[];
   };
   effort: RecommendationEffort;
   reasoning: string;

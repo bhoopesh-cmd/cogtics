@@ -15,6 +15,7 @@ import {
   Building2,
   Mail,
   Tag,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   listIdentityQueue,
@@ -235,7 +236,7 @@ function StatCard({
 }: {
   label: string;
   value: number;
-  icon: React.ComponentType<{ size: number; className?: string }>;
+  icon: LucideIcon;
   color: string;
 }) {
   return (
@@ -353,7 +354,7 @@ function FeatureBadge({
   icon: Icon,
   label,
 }: {
-  icon: React.ComponentType<{ size: number; className?: string }>;
+  icon: LucideIcon;
   label: string;
 }) {
   return (

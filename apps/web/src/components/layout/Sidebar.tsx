@@ -53,12 +53,15 @@ export function Sidebar() {
   useEffect(() => {
     const fetchBadges = async () => {
       try {
-        const issueSummary = await getIssueSummary();
+        const summaryRes = await getIssueSummary();
+        if (!summaryRes.ok) return;
+
+        const byStatus = summaryRes.data?.byStatus ?? {};
         
         // Count open issues (not resolved, not dismissed)
-        const openCount = (issueSummary.byStatus?.['open'] ?? 0) + 
-                         (issueSummary.byStatus?.['investigating'] ?? 0) + 
-                         (issueSummary.byStatus?.['confirmed'] ?? 0);
+        const openCount = (byStatus['open'] ?? 0) + 
+                         (byStatus['investigating'] ?? 0) + 
+                         (byStatus['confirmed'] ?? 0);
         
         setBadges({
           openIssues: openCount > 0 ? String(openCount) : null,

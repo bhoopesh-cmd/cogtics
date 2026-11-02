@@ -6,19 +6,13 @@ import {
   listSimulationTemplates,
   listSnapshots,
   type SimulationTemplate,
+  type Snapshot,
 } from '@/lib/api/endpoints';
 
 interface CreateSimulationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreated: (simulationId: string) => void;
-}
-
-interface Snapshot {
-  id: string;
-  name: string | null;
-  status: string;
-  createdAt: string;
 }
 
 export function CreateSimulationModal({
@@ -183,7 +177,7 @@ export function CreateSimulationModal({
                 <option value="">Select a snapshot...</option>
                 {snapshots.map((snap) => (
                   <option key={snap.id} value={snap.id}>
-                    {snap.name || snap.id} ({new Date(snap.createdAt).toLocaleDateString()})
+                    {String(snap.metadata?.name ?? snap.id)} ({new Date(snap.startedAt).toLocaleDateString()})
                   </option>
                 ))}
               </select>

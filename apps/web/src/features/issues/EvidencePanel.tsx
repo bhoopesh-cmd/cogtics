@@ -96,8 +96,11 @@ export function EvidencePanel({ issueId, isAdmin = false, className }: EvidenceP
     );
   }
 
-  const { evidence, sources, calculations, clauses } = data;
+  const { evidence, sources, calculations, clauses } = data as EvidenceResponse;
   const completenessLabel = getCompletenessLabel(evidence.completenessScore);
+  const breakdownEntries = Object.entries(
+    evidence.completenessBreakdown ?? {}
+  ) as Array<[string, number]>;
 
   return (
     <div className={cn('bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden', className)}>
@@ -138,28 +141,24 @@ export function EvidencePanel({ issueId, isAdmin = false, className }: EvidenceP
             <p className="text-sm text-zinc-400 leading-relaxed">{evidence.summary}</p>
             
             {/* Completeness Breakdown */}
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-              {Object.entries(evidence.completenessBreakdown).map(([key, value]) => (
-                <div key={key} className="bg-zinc-800/50 rounded-lg p-3">
-                  <div className="text-xs text-zinc-500 mb-1">{formatBreakdownKey(key)}</div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          'h-full rounded-full transition-all',
-                          value >= 0.9 ? 'bg-emerald-500' : value >= 0.7 ? 'bg-amber-500' : 'bg-rose-500'
-                        )}
-                        style={{ width: `${(value as number) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-zinc-400">{Math.round((value as number) * 100)}%</span>
+            {breakdownEntries.map(([key, value]: [string, number]) => (
+              <div key={key} className="bg-zinc-800/50 rounded-lg p-3">
+                <div className="text-xs text-zinc-500 mb-1">{formatBreakdownKey(key)}</div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all',
+                        value >= 0.9 ? 'bg-emerald-500' : value >= 0.7 ? 'bg-amber-500' : 'bg-rose-500'
+                      )}
+                      style={{ width: `${value * 100}%` }}
+                    />
                   </div>
+                  <span className="text-xs text-zinc-400">{Math.round(value * 100)}%</span>
                 </div>
-              ))}
-            </div>
-
-            {/* Variance Info */}
-            {evidence.dataJson?.variance && (
+              </div>
+            ))}
+            {!!evidence.dataJson?.variance && (
               <div className="mt-4 bg-zinc-800/50 rounded-lg p-4">
                 <div className="text-sm font-medium text-white mb-2">Variance Analysis</div>
                 <VarianceDisplay variance={evidence.dataJson.variance as any} />

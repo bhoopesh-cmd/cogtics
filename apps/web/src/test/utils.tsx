@@ -1,4 +1,5 @@
 import React, { ReactElement } from 'react';
+import { expect } from 'vitest';
 import { render, RenderOptions } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';

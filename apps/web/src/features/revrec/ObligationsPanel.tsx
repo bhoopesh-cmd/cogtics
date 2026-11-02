@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight, Package, Clock, Users, Wrench, Headphones } from 'lucide-react';
+import { ChevronRight, Package, Clock, Users, Wrench, Headphones, type LucideIcon } from 'lucide-react';
 import {
   listRevRecObligations,
   getRevRecObligation,
@@ -17,7 +17,7 @@ interface ObligationsPanelProps {
   snapshotId?: string;
 }
 
-const OBLIGATION_ICONS: Record<string, React.FC<{ size: number; className?: string }>> = {
+const OBLIGATION_ICONS: Record<string, LucideIcon> = {
   subscription: Package,
   usage: Clock,
   one_time: Clock,

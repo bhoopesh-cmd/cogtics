@@ -35,8 +35,9 @@ export function UploadDetailPage() {
       return res.data;
     },
     enabled: !!uploadId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Poll while processing
+      const data = query.state.data;
       if (data?.status === 'processing' || data?.status === 'uploading') {
         return 3000;
       }

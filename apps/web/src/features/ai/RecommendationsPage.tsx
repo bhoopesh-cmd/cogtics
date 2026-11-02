@@ -10,8 +10,7 @@ import type {
   AIRecommendation, 
   RecommendationSummary, 
   RecommendationPriority, 
-  RecommendationStatus,
-  RecommendationEffort
+  RecommendationStatus
 } from '@/lib/api/endpoints';
 import { 
   PriorityBadge, 

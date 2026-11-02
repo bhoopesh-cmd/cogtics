@@ -16,6 +16,7 @@ import {
   RefreshCw,
   History,
   FileSearch,
+  type LucideIcon,
 } from 'lucide-react';
 import { getContractDetail } from '@/lib/api/endpoints';
 import DecorativeDots from '@/components/ui/DecorativeDots';
@@ -250,7 +251,7 @@ export function ContractDetailPage() {
   );
 }
 
-function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ size: number; className?: string }>; label: string; value: string }) {
+function InfoRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3">
       <Icon size={14} className="text-zinc-500" />
