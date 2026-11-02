@@ -140,10 +140,11 @@ export function generateStraightLineSchedule(
     }
     
     const periodDays = differenceInDays(periodEnd, currentStart) + 1;
+    const nextStart = addDays(periodEnd, 1);
     
     // Calculate scheduled amount
     // For last period, allocate remainder to avoid rounding issues
-    const isLastPeriod = periodEnd.getTime() >= serviceEndDate.getTime();
+    const isLastPeriod = nextStart > serviceEndDate;
     const scheduledAmount = isLastPeriod
       ? round(totalAmount - allocatedTotal, 2)
       : round(dailyRate * periodDays, 2);
@@ -163,7 +164,6 @@ export function generateStraightLineSchedule(
     });
     
     // Move to next period - exit if we've reached the end
-    const nextStart = addDays(periodEnd, 1);
     if (nextStart > serviceEndDate) {
       break;
     }
