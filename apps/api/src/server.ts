@@ -162,7 +162,7 @@ async function main() {
 
   // Serve frontend (production only - dev uses separate Vite server with proxy)
   if (!isDev) {
-    const webDistPath = path.resolve(__dirname, '../../../web/dist');
+    const webDistPath = path.resolve(__dirname, '../../web/dist');
     await app.register(fastifyStatic, {
       root: webDistPath,
       prefix: '/',

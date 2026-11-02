@@ -79,6 +79,10 @@ class ApiClient {
     return this.request<T>('POST', path, { body, token });
   }
 
+  patch<T>(path: string, body?: unknown, token?: string | null): Promise<ApiResponse<T>> {
+    return this.request<T>('PATCH', path, { body, token });
+  }
+
   delete<T>(path: string, token?: string | null): Promise<ApiResponse<T>> {
     return this.request<T>('DELETE', path, { token });
   }
