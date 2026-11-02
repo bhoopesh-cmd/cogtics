@@ -50,6 +50,14 @@ validation-*.json
 resilience-test-*.json
 *.resolved
 
+# Generated source artifacts (build output must go to dist/)
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
+apps/*/src/**/*.js
+apps/*/src/**/*.js.map
+
 # Caches
 .eslintcache
 .cache/
