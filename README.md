@@ -192,7 +192,7 @@ curl http://localhost:3000/me \
 ```bash
 pnpm dev            # Docker infra + API + web
 pnpm dev:worker     # background worker
-pnpm build          # build web and API
+pnpm build          # build web, API, and worker
 pnpm lint           # ESLint
 pnpm typecheck      # TypeScript across the workspace
 pnpm test:unit      # unit + component tests (what CI runs)
@@ -215,7 +215,7 @@ See [`docs/local-dev.md`](docs/local-dev.md) for the full setup and troubleshoot
 - **End-to-end** — Playwright flows under `e2e/`.
 - **Validation** — `tools/validation` covers detection, tenant isolation, resilience, and security.
 
-CI runs `pnpm test:unit` on every push and pull request. Current results and known gaps are tracked in [`docs/TESTING_STATUS.md`](docs/TESTING_STATUS.md).
+CI runs lint, typecheck, unit tests, and the full web/API/worker build on every push and pull request. Current results and known gaps are tracked in [`docs/TESTING_STATUS.md`](docs/TESTING_STATUS.md).
 
 ---
 
