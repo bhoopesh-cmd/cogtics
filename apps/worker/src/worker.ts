@@ -145,9 +145,9 @@ async function main() {
   logger.info('Starting worker...');
 
   // Initialize connectors and encryption
-  await initializeConnectors({});
+  await initializeConnectors({} as any);
   if (config.TOKEN_ENCRYPTION_KEY) {
-    initializeEncryptor(config.TOKEN_ENCRYPTION_KEY);
+    initializeEncryptor(config.TOKEN_ENCRYPTION_KEY as any);
     logger.info('Token encryptor initialized');
   }
 
@@ -180,7 +180,7 @@ async function main() {
   // Create queues map for inter-job communication
   const queues = new Map<string, Queue>();
   for (const queueName of QUEUE_NAMES) {
-    queues.set(queueName, new Queue(queueName, { connection: redis }));
+    queues.set(queueName, new Queue(queueName, { connection: redis as any }));
   }
 
   // Create workers for each queue
@@ -320,10 +320,10 @@ async function main() {
               break;
             // Phase 10: Exports & Digests
             case 'export.csv.generate':
-              result = await processExportCsvJob(payload, jobLogger, db, getStorageClient());
+              result = await processExportCsvJob(payload, jobLogger, db, getStorageClient() as any);
               break;
             case 'export.pdf.render':
-              result = await processExportPdfJob(payload, jobLogger, db, getStorageClient());
+              result = await processExportPdfJob(payload, jobLogger, db, getStorageClient() as any);
               break;
             case 'digest.send':
               result = await processDigestSendJob(payload, jobLogger, db);
@@ -398,7 +398,7 @@ async function main() {
         });
       },
       {
-        connection: redis,
+        connection: redis as any,
         concurrency: config.WORKER_CONCURRENCY,
         // Apply retry policy per queue type (Phase 11)
         settings: {

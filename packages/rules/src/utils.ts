@@ -3,7 +3,7 @@
  * Helper functions for rule implementations
  */
 import { differenceInDays, parseISO, isValid, format } from 'date-fns';
-import SHA256 from 'crypto-js/sha256';
+import { createHash } from 'node:crypto';
 import type { IssueDimensions } from './types.js';
 
 // ============================================
@@ -129,7 +129,7 @@ export function generateIssueKey(
     .join('|');
 
   const input = `${ruleId}|${ruleVersion}|${sortedDimensions}`;
-  return SHA256(input).toString().substring(0, 32);
+  return createHash('sha256').update(input).digest('hex').substring(0, 32);
 }
 
 // ============================================

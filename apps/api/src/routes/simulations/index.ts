@@ -141,8 +141,8 @@ export const simulationRoutes: FastifyPluginAsync = async (fastify) => {
                 id: generateSimulationOverrideId(),
                 tenant_id: tenantId,
                 simulation_id: simulationId,
-                override_type: override.overrideType as string,
-                target_type: override.targetType as string,
+                override_type: override.overrideType as any,
+                target_type: override.targetType as any,
                 target_id: override.targetId as string,
                 field_path: override.fieldPath as string || null,
                 original_value_json: null,
@@ -574,7 +574,7 @@ export const simulationRoutes: FastifyPluginAsync = async (fastify) => {
       .execute();
 
     // Queue the simulation job
-    const simulationQueue = queues?.get?.('simulation.run');
+    const simulationQueue = (queues as any)?.get?.('simulation.run');
     if (simulationQueue) {
       await simulationQueue.add('simulation.run', {
         tenantId,
@@ -873,8 +873,8 @@ export const simulationRoutes: FastifyPluginAsync = async (fastify) => {
             id: generateSimulationOverrideId(),
             tenant_id: tenantId,
             simulation_id: simulationId,
-            override_type: override.overrideType as string,
-            target_type: override.targetType as string,
+            override_type: override.overrideType as any,
+            target_type: override.targetType as any,
             target_id: override.targetId as string,
             field_path: override.fieldPath as string || null,
             original_value_json: null,

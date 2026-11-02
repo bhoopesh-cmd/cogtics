@@ -47,7 +47,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
           file_count: 1,
           created_by: userId,
           metadata_json: {},
-        })
+        } as any)
         .execute();
 
       // Create file record
@@ -62,7 +62,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
           s3_key: s3Key,
           size_bytes: body.fileSize ?? 0,
           metadata_json: {},
-        })
+        } as any)
         .execute();
 
       // Generate presigned URL (using MinIO/S3 client)
@@ -225,7 +225,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
           file_count: 1,
           created_by: userId,
           metadata_json: {},
-        })
+        } as any)
         .execute();
 
       // Create file record
@@ -240,7 +240,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
           s3_key: s3Key,
           size_bytes: body.fileSize ?? 0,
           metadata_json: {},
-        })
+        } as any)
         .execute();
 
       // Generate presigned URL

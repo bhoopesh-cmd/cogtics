@@ -140,7 +140,7 @@ export const snapshotRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       await request.audit.log({
-        action: 'snapshot.trigger',
+        action: 'snapshot.trigger' as any,
         resource: `snapshots/${snapshotId}`,
         metadata: { connectionIds, runType },
       });

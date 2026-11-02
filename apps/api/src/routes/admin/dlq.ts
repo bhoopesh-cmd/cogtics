@@ -138,7 +138,7 @@ export const dlqRoutes: FastifyPluginAsync = async (fastify) => {
       .values({
         id: newJobId,
         tenant_id: tenantId,
-        type: dlqEntry.job_type,
+        type: dlqEntry.job_type as any,
         status: 'pending',
         payload_json: dlqEntry.payload_json,
         created_at: new Date(),
@@ -217,7 +217,7 @@ export const dlqRoutes: FastifyPluginAsync = async (fastify) => {
           .values({
             id: newJobId,
             tenant_id: tenantId,
-            type: entry.job_type,
+            type: entry.job_type as any,
             status: 'pending',
             payload_json: entry.payload_json,
             created_at: new Date(),

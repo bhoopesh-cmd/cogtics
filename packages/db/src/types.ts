@@ -1949,5 +1949,12 @@ export interface Database {
   dead_letter_jobs: DeadLetterJobsTable;
   integrity_check_runs: IntegrityCheckRunsTable;
   replay_audit: ReplayAuditTable;
+  // Phase 5/7 tables that predate the generated types
+  review_queue: any;
+  term_conflicts: any;
+  term_conflict_candidates: any;
+  contract_bundles: any;
+  ai_discovered_issues: any;
+  ai_recommendations: any;
 }
 

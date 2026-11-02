@@ -314,7 +314,7 @@ export class AnomalyDetectionLLM extends ProductionLLMClient {
    * Convert API responses to AIDiscoveredIssue format
    */
   private convertToAIDiscoveredIssues(
-    responses: AIDiscoveredIssueResponse[]
+    responses: any[]
   ): AIDiscoveredIssue[] {
     return responses.map(r => ({
       id: `adi_${nanoid(16)}`,
@@ -326,7 +326,7 @@ export class AnomalyDetectionLLM extends ProductionLLMClient {
       evidence: r.evidence,
       reasoning: r.reasoning,
       requiresReview: computeNeedsReview(r.confidence),
-    }));
+    } as AIDiscoveredIssue));
   }
 
   /**

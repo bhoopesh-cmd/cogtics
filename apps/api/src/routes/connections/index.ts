@@ -38,7 +38,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/', {
     preHandler: [fastify.requirePermission('integrations.manage')],
   }, async (request) => {
-    const { tenantId } = request.auth;
+    const tenantId = request.tenantId;
 
     const connections = await fastify.db
       .selectFrom('connections')
@@ -60,7 +60,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: [fastify.requirePermission('integrations.manage')],
   }, async (request, reply) => {
     const { id } = request.params;
-    const { tenantId } = request.auth;
+    const tenantId = request.tenantId;
 
     const connection = await fastify.db
       .selectFrom('connections')
@@ -154,7 +154,8 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const { provider, code } = body.data;
-    const { tenantId, userId } = request.auth;
+    const tenantId = request.tenantId;
+    const userId = request.userId;
     const config = fastify.config;
 
     // Get OAuth config
@@ -224,7 +225,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Audit log
       await request.audit.log({
-        action: 'connection.created',
+        action: 'connection.created' as any,
         resource: `connections/${connectionId}`,
         metadata: {
           provider,
@@ -281,7 +282,8 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.redirect(`${frontendUrl}/login?returnTo=/connections/${provider}/callback?code=${code}&state=${state || ''}`);
     }
 
-    const { tenantId, userId } = request.auth;
+    const tenantId = request.tenantId;
+    const userId = request.userId;
 
     const oauthConfig = getOAuthConfig(config, provider);
     if (!oauthConfig) {
@@ -342,7 +344,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
         .execute();
 
       await request.audit.log({
-        action: 'connection.created',
+        action: 'connection.created' as any,
         resource: `connections/${connectionId}`,
         metadata: {
           provider,
@@ -372,7 +374,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: [fastify.requirePermission('integrations.manage')],
   }, async (request, reply) => {
     const { id } = request.params;
-    const { tenantId } = request.auth;
+    const tenantId = request.tenantId;
 
     const connection = await fastify.db
       .selectFrom('connections')
@@ -409,7 +411,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: [fastify.requirePermission('integrations.manage')],
   }, async (request, reply) => {
     const { id } = request.params;
-    const { tenantId } = request.auth;
+    const tenantId = request.tenantId;
 
     const connection = await getConnectionWithCredentials(fastify.db, id, tenantId);
     if (!connection) {
@@ -466,7 +468,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: [fastify.requirePermission('integrations.manage')],
   }, async (request, reply) => {
     const { id } = request.params;
-    const { tenantId } = request.auth;
+    const tenantId = request.tenantId;
     const body = TriggerSyncRequestSchema.parse(request.body ?? {});
 
     const connection = await fastify.db
@@ -537,7 +539,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     await request.audit.log({
-      action: 'connection.sync.triggered',
+      action: 'connection.sync.triggered' as any,
       resource: `connections/${id}`,
       metadata: {
         runId,
@@ -559,7 +561,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: [fastify.requirePermission('integrations.manage')],
   }, async (request, reply) => {
     const { id } = request.params;
-    const { tenantId } = request.auth;
+    const tenantId = request.tenantId;
 
     const connection = await getConnectionWithCredentials(fastify.db, id, tenantId);
     if (!connection) {
@@ -605,7 +607,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
             tokenType: refreshed.tokenType,
             instanceUrl: refreshed.instanceUrl,
             externalAccountId: refreshed.externalAccountId,
-          };
+          } as any;
           
           request.log.info({ provider: connection.provider }, 'Token refreshed successfully');
         } catch (refreshError) {
@@ -648,7 +650,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: [fastify.requirePermission('integrations.manage')],
   }, async (request, reply) => {
     const { id } = request.params;
-    const { tenantId } = request.auth;
+    const tenantId = request.tenantId;
 
     const connection = await fastify.db
       .selectFrom('connections')
@@ -668,7 +670,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
       .execute();
 
     await request.audit.log({
-      action: 'connection.deleted',
+      action: 'connection.deleted' as any,
       resource: `connections/${id}`,
       metadata: {
         provider: connection.provider,
@@ -689,7 +691,8 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: [fastify.requirePermission('integrations.manage')],
   }, async (request, reply) => {
     const { apiKey, displayName } = request.body;
-    const { tenantId, userId } = request.auth;
+    const tenantId = request.tenantId;
+    const userId = request.userId;
 
     if (!apiKey || typeof apiKey !== 'string') {
       return reply.badRequest('API key is required');
@@ -744,7 +747,7 @@ export const connectionRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Audit log
       await request.audit.log({
-        action: 'connection.created',
+        action: 'connection.created' as any,
         resource: `connections/${connectionId}`,
         metadata: {
           provider: 'stripe',

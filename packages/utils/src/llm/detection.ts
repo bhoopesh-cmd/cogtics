@@ -170,8 +170,8 @@ export class DetectionLLM extends ProductionLLMClient {
       for (let i = 0; i < contractIssues.length; i += this.batchSize) {
         const batch = contractIssues.slice(i, i + this.batchSize);
         const batchEnriched = await this.enrichBatch(batch, {
-          contractName: contract?.name,
-          customerName: customer?.name,
+          contractName: contract?.name ?? undefined,
+          customerName: customer?.name ?? undefined,
           contractValue: contract?.total_value ? Number(contract.total_value) : undefined,
           currency: contract?.currency || 'USD',
         });
@@ -247,13 +247,12 @@ export class DetectionLLM extends ProductionLLMClient {
               businessImpact: enrichment.businessImpact,
               suggestedFix: enrichment.suggestedFix,
               confidence: enrichment.confidence,
-              relatedIssueIds: enrichment.relatedIssueIndices
+              relatedIssueIds: (enrichment.relatedIssueIndices ?? [])
                 .filter(i => i >= 0 && i < issues.length && issues[i])
                 .map(i => this.generateIssueKey(issues[i])),
               explanation: enrichment.explanation,
               priority: enrichment.priority,
               tags: enrichment.tags,
-              needsReview: computeNeedsReview(enrichment.confidence),
             },
             issueKey,
             aiEnrichedAt: new Date(),
@@ -265,7 +264,7 @@ export class DetectionLLM extends ProductionLLMClient {
         return this.createFallbackEnrichment(issue, issueKey);
       });
 
-      return enriched;
+      return enriched as AIEnrichedIssue[];
     } catch (error) {
       console.warn('Failed to enrich batch:', error);
       this.stats.failedCount += issues.length;
@@ -292,7 +291,6 @@ export class DetectionLLM extends ProductionLLMClient {
         explanation: 'AI enrichment was not successful for this issue',
         priority: this.mapSeverityToPriority(issue.severity),
         tags: [issue.category],
-        needsReview: true, // Fallback always needs review
       },
       issueKey,
       aiEnrichedAt: new Date(),
@@ -358,8 +356,8 @@ export class DetectionLLM extends ProductionLLMClient {
       context.customers.find(c => c.id === contract?.customer_id);
 
     const prompt = fixSuggestionPrompt(issue, {
-      contractName: contract?.name,
-      customerName: customer?.name,
+      contractName: contract?.name ?? undefined,
+      customerName: customer?.name ?? undefined,
       contractTerms: contract?.terms?.map(t => ({
         type: t.term_type,
         value: t.value_json,
@@ -389,10 +387,17 @@ export class DetectionLLM extends ProductionLLMClient {
       }
       return {
         immediateAction: parsed.immediateAction,
-        systemChanges: parsed.systemChanges,
-        processImprovements: parsed.processImprovements,
-        estimatedImpact: parsed.estimatedImpact,
-        riskAssessment: parsed.riskAssessment,
+        systemChanges: (parsed.systemChanges ?? []).map((change) => ({
+          ...change,
+          parameters: change.parameters ?? {},
+        })),
+        processImprovements: parsed.processImprovements ?? [],
+        estimatedImpact: {
+          revenueChange: parsed.estimatedImpact?.revenueChange ?? 0,
+          currency: parsed.estimatedImpact?.currency ?? 'USD',
+          confidence: parsed.estimatedImpact?.confidence ?? 0,
+        },
+        riskAssessment: parsed.riskAssessment ?? '',
       };
     } catch (error) {
       console.warn('Failed to suggest fix:', error);

@@ -58,7 +58,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
       .selectFrom('ai_recommendations')
       .selectAll()
       .where('tenant_id', '=', tenantId)
-      .where(db.raw(`issue_ids @> ?::jsonb`, [`["${id}"]`]) as any)
+      .where((db as any).raw(`issue_ids @> ?::jsonb`, [`["${id}"]`]) as any)
       .orderBy('created_at', 'desc')
       .execute();
 
@@ -188,7 +188,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Get total estimated impact
     const impactResult = await baseQuery
-      .select(db.raw(`SUM((estimated_impact_json->>'revenueChange')::numeric) as total_impact`) as any)
+      .select((db as any).raw(`SUM((estimated_impact_json->>'revenueChange')::numeric) as total_impact`) as any)
       .executeTakeFirst();
 
     // Get total count
@@ -296,7 +296,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
       name: body.name || `AI: ${recommendation.title}`,
       description: suggestedSim.description || recommendation.description,
       status: 'draft',
-      overrides_json: suggestedSim.overrides,
+      overrides_json: suggestedSim.overrides as any,
       metadata_json: {
         recommendationId: id,
         createdBy: userId,
@@ -305,7 +305,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
       created_by: userId,
       created_at: now,
       updated_at: now,
-    }).execute();
+    } as any).execute();
 
     // Update recommendation
     await db

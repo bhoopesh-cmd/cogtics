@@ -159,10 +159,10 @@ export async function processTermExtractJob(
       try {
         // Get document text for context
         const document = await db
-          .selectFrom('contract_documents')
-          .select(['extracted_text', 'document_type'])
-          .where('id', '=', documentId)
-          .executeTakeFirst();
+          .selectFrom('contract_documents' as any)
+          .select(['extracted_text', 'document_type'] as any)
+          .where('id', '=', documentId as any)
+          .executeTakeFirst() as { extracted_text?: string; document_type?: string } | undefined;
 
         const textContext = document?.extracted_text?.substring(0, 10000) || '';
         const termTypesToExtract = [
@@ -421,7 +421,7 @@ async function createReviewQueueItems(
 
   if (reviewItems.length > 0) {
     await db
-      .insertInto('review_queue')
+      .insertInto('review_queue' as any)
       .values(reviewItems)
       .execute();
 

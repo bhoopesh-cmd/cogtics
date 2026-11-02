@@ -242,7 +242,7 @@ export const R122_MissingExpectedTax: Rule = {
           'UK': 20, 'DE': 19, 'FR': 20, 'AU': 10, 'CA': 5,
         };
         const rate = TAX_RATES[jurisdiction] || 5; // Default 5% if unknown
-        const expectedTax = invoice.subtotal * (rate / 100);
+        const expectedTax = (invoice.subtotal ?? 0) * (rate / 100);
 
         issues.push({
           ruleId: 'R122',

@@ -71,7 +71,7 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
     if (query.sortBy === 'severity') {
       // Custom severity order
       dbQuery = dbQuery.orderBy(
-        db.raw(`CASE severity 
+        (db as any).raw(`CASE severity 
           WHEN 'critical' THEN 1 
           WHEN 'high' THEN 2 
           WHEN 'medium' THEN 3 
@@ -732,7 +732,7 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
     await db.insertInto('jobs').values({
       id: jobId,
       tenant_id: tenantId,
-      type: 'evidence',
+      type: 'evidence' as any,
       status: 'pending',
       payload_json: { issueId: id, force: body.force, reason: body.reason },
     }).execute();

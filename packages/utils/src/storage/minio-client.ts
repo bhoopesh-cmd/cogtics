@@ -53,6 +53,25 @@ export class StorageService {
     }
 
     /**
+     * Upload an object scoped to a tenant (compatibility helper for workers).
+     */
+    async putObject(
+        tenantId: string,
+        key: string,
+        body: Readable | Buffer | string,
+        options?: { contentType?: string }
+    ): Promise<void> {
+        const fullKey = key.startsWith(`tenants/${tenantId}/`)
+            ? key
+            : `tenants/${tenantId}/${key}`;
+        await this.uploadStream(
+            fullKey,
+            body,
+            options?.contentType || 'application/octet-stream'
+        );
+    }
+
+    /**
      * Upload a file stream to storage
      */
     async uploadStream(

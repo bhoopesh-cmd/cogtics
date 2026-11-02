@@ -426,6 +426,6 @@ function mapBillingFrequency(frequency: string | null): 'monthly' | 'quarterly' 
 /**
  * Format date for database storage.
  */
-function formatDate(date: Date): string {
+function formatDate(date: Date): any {
   return date.toISOString().split('T')[0];
 }

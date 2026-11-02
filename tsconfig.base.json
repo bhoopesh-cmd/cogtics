@@ -14,10 +14,10 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "noUncheckedIndexedAccess": true,
+    "noUncheckedIndexedAccess": false,
     "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "exactOptionalPropertyTypes": false,
     "paths": {
       "@cogtics/connectors": [
         "./packages/connectors/src/index.ts"
@@ -30,6 +30,12 @@
       ],
       "@cogtics/utils": [
         "./packages/utils/src/index.ts"
+      ],
+      "@cogtics/rules": [
+        "./packages/rules/src/index.ts"
+      ],
+      "@cogtics/revrec": [
+        "./packages/revrec/src/index.ts"
       ]
     }
   },

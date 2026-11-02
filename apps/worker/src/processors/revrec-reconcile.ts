@@ -92,8 +92,8 @@ export async function processRevRecReconcileJob(
           .where('tenant_id', '=', tenantId)
           .where('snapshot_id', '=', snapshotId)
           .where('contract_id', '=', contract.id)
-          .where('period_start', '>=', periodStart)
-          .where('period_end', '<=', periodEnd)
+          .where('period_start', '>=', periodStart as any)
+          .where('period_end', '<=', periodEnd as any)
           .execute();
 
         // Persist new reconciliations
@@ -188,8 +188,8 @@ async function loadSchedulesForPeriod(
     .selectFrom('revenue_schedules')
     .selectAll()
     .where('obligation_id', 'in', obligationIds)
-    .where('period_start', '>=', periodStart)
-    .where('period_end', '<=', periodEnd)
+    .where('period_start', '>=', periodStart as any)
+    .where('period_end', '<=', periodEnd as any)
     .execute();
 
   return scheduleRows.map(row => ({
@@ -222,23 +222,23 @@ async function loadInvoicesForPeriod(
     .where('tenant_id', '=', tenantId)
     .where('snapshot_id', '=', snapshotId)
     .where('contract_id', '=', contractId)
-    .where('invoice_date', '>=', periodStart)
-    .where('invoice_date', '<=', periodEnd)
+    .where('invoice_date', '>=', periodStart as any)
+    .where('invoice_date', '<=', periodEnd as any)
     .execute();
 
   return invoiceRows.map(row => ({
     id: row.id,
     contractId: row.contract_id,
-    invoiceDate: new Date(row.invoice_date as string),
+    invoiceDate: new Date(row.invoice_date as any),
     total: Number(row.total),
-    periodStart: row.period_start ? new Date(row.period_start as string) : null,
-    periodEnd: row.period_end ? new Date(row.period_end as string) : null,
+    periodStart: row.period_start ? new Date(row.period_start as any) : null,
+    periodEnd: row.period_end ? new Date(row.period_end as any) : null,
   }));
 }
 
 /**
  * Format date for database storage.
  */
-function formatDate(date: Date): string {
+function formatDate(date: Date): any {
   return date.toISOString().split('T')[0];
 }

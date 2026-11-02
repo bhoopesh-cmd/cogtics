@@ -134,7 +134,7 @@ export async function requeueFromDeadLetterQueue(
       .values({
         id: newJobId,
         tenant_id: dlqEntry.tenant_id,
-        type: dlqEntry.job_type,
+        type: dlqEntry.job_type as any,
         status: 'pending',
         payload_json: dlqEntry.payload_json,
         created_at: new Date(),

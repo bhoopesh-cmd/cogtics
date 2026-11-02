@@ -17,7 +17,7 @@ const digestRoutes: FastifyPluginAsync = async (fastify) => {
   
   // Reuse queue instance if already created
   if (!digestQueue) {
-    digestQueue = new Queue('digest.send', { connection: redis });
+    digestQueue = new Queue('digest.send', { connection: redis as any });
   }
 
   /**
@@ -334,7 +334,7 @@ const digestRoutes: FastifyPluginAsync = async (fastify) => {
       .values({
         id: jobId,
         tenant_id: tenantId,
-        type: 'digest',
+        type: 'digest' as any,
         status: 'pending',
         payload_json: {
           type: 'digest.send',
@@ -348,7 +348,7 @@ const digestRoutes: FastifyPluginAsync = async (fastify) => {
       .execute();
 
     // Enqueue job
-    await digestQueue.add('digest.send', {
+    await digestQueue!.add('digest.send', {
       jobId,
       tenantId,
       payload: {

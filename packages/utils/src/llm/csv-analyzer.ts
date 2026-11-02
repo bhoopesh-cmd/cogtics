@@ -225,6 +225,10 @@ Provide analysis in this JSON format:
       suggestions: [],
       warnings: ['Failed to parse AI response'],
     });
+
+    if (!parsed) {
+      return analyzeCSVWithRules(headers, sampleRows, hints);
+    }
     
     const detectedType = parsed?.entityType || 'unknown';
     const schema = ENTITY_SCHEMA[detectedType as CSVEntityType] || ENTITY_SCHEMA.unknown;

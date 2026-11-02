@@ -213,7 +213,7 @@ async function main() {
         relax_column_count: true,
       });
       
-      csvData[tableName] = rows;
+      csvData[tableName] = rows as CSVRow[];
       console.log(`  ✓ Loaded ${tableName}: ${rows.length} rows`);
     }
     
@@ -245,7 +245,7 @@ async function main() {
             .selectFrom(tableName as any)
             .select((eb: any) => eb.fn.count('id').as('count'))
             .executeTakeFirst();
-          return { tableName, count: result?.count || 0 };
+          return { tableName, count: (result as { count?: number } | undefined)?.count ?? 0 };
         } catch {
           return { tableName, count: 0 };
         }

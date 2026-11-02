@@ -179,7 +179,7 @@ Return JSON with the resolution.`;
       suggestedAction: 'review',
     };
     const parsed = safeParseLLMResponse(ConflictResolutionSchema, response, fallback);
-    return parsed || fallback;
+    return (parsed || fallback) as ConflictResolution;
   }
 
   /**
@@ -319,7 +319,9 @@ Return JSON with format: { "overrides": [{ "type": "...", "matchedText": "...", 
         throw new Error(`OpenAI API error: ${response.status} ${error}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
       return data.choices?.[0]?.message?.content || '';
     } finally {
       clearTimeout(timeoutId);

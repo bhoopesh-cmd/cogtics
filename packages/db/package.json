@@ -12,7 +12,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --rootDir ../..",
     "build": "tsc",
     "migrate": "dotenv -e ../../.env -- dbmate -d ./migrations --no-dump-schema up",
     "migrate:down": "dotenv -e ../../.env -- dbmate -d ./migrations --no-dump-schema down",

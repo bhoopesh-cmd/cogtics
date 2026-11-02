@@ -3,9 +3,10 @@
  * Calculates severity and confidence for detected issues
  * Implements meta-rules R070-R072 as scoring logic
  */
-import type { DetectionConfig, IssueSeverity } from '@cogtics/schemas';
+import type { DetectionConfig } from '@cogtics/schemas';
 import type { Issue as DbIssue } from '@cogtics/db';
 import type {
+  IssueSeverity,
   RuleIssue,
   RuleContext,
   ContractWithTerms,

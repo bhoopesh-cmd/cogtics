@@ -213,7 +213,7 @@ const aiDiscoveryRoutes: FastifyPluginAsync = async (fastify) => {
       rule_id: `AI_${discovery.category.toUpperCase()}`,
       rule_version: '1.0.0',
       issue_key: `ai_${discovery.category}_${id}`,
-      category: mapAICategoryToIssueCategory(discovery.category),
+      category: mapAICategoryToIssueCategory(discovery.category) as any,
       status: 'open',
       severity: body.severity || discovery.severity,
       confidence: Number(discovery.confidence),
@@ -244,7 +244,7 @@ const aiDiscoveryRoutes: FastifyPluginAsync = async (fastify) => {
       ai_enriched_at: now,
       created_at: now,
       updated_at: now,
-    }).execute();
+    } as any).execute();
 
     // Update discovery
     await db

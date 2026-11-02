@@ -1,4 +1,4 @@
-import { Kysely, PostgresDialect } from 'kysely';
+import { Kysely, PostgresDialect, sql } from 'kysely';
 import pg from 'pg';
 import type { Database } from './types.js';
 
@@ -67,9 +67,7 @@ export async function withTenantContext<T>(
   return database.transaction().execute(async (trx) => {
     // Set the tenant context for RLS
     await trx.executeQuery(
-      trx
-        .raw(`SET LOCAL app.tenant_id = '${tenantId}'`)
-        .compile(trx)
+      sql`SET LOCAL app.tenant_id = ${sql.lit(tenantId)}`.compile(trx)
     );
 
     return fn(trx as unknown as Kysely<Database>);

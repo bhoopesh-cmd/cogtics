@@ -1,17 +1,20 @@
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import type { TenantId } from '@cogtics/schemas';
+import { sql } from 'kysely';
+import type { TenantId, UserId } from '@cogtics/schemas';
 
 declare module 'fastify' {
   interface FastifyRequest {
-    tenantId: TenantId | null;
+    tenantId: TenantId;
+    userId: UserId;
     setTenantContext: () => Promise<void>;
   }
 }
 
 const tenantPluginImpl: FastifyPluginAsync = async (fastify) => {
   // Decorate request with tenant context
-  fastify.decorateRequest('tenantId', null);
+  fastify.decorateRequest('tenantId', null as unknown as TenantId);
+  fastify.decorateRequest('userId', null as unknown as UserId);
   fastify.decorateRequest('setTenantContext', null);
 
   fastify.addHook('preHandler', async (request) => {
@@ -25,16 +28,13 @@ const tenantPluginImpl: FastifyPluginAsync = async (fastify) => {
     }
 
     request.tenantId = request.auth.tenantId;
+    request.userId = request.auth.userId;
 
     // Function to set tenant context in database session
     request.setTenantContext = async () => {
-      if (request.tenantId) {
-        await fastify.db.executeQuery(
-          fastify.db
-            .raw(`SET LOCAL app.tenant_id = '${request.tenantId}'`)
-            .compile(fastify.db)
-        );
-      }
+      await fastify.db.executeQuery(
+        sql`SET LOCAL app.tenant_id = ${sql.lit(request.tenantId)}`.compile(fastify.db)
+      );
     };
   });
 };

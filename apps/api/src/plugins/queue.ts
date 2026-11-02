@@ -33,7 +33,7 @@ const QUEUE_NAMES: QueueName[] = [
   'upload.csv.parse',
   'upload.csv.finalize',
   'upload.pdf.parse',
-  'upload.reprocess',
+  'upload.reprocess' as any,
   // Contract intelligence queues
   'contracts.pdf.extract',
   'contracts.clause.segment',
@@ -67,7 +67,7 @@ const queuePluginImpl: FastifyPluginAsync = async (fastify) => {
 
   for (const name of QUEUE_NAMES) {
     queues[name] = new Queue(name, {
-      connection: redis,
+      connection: redis as any,
       defaultJobOptions: {
         removeOnComplete: 100,
         removeOnFail: 1000,

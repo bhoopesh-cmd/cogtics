@@ -10,8 +10,15 @@ import type {
   HealthResult,
 } from '../types.js';
 import { buildAuthUrl, validateOAuthConfig } from '../base/oauth.js';
-import { createHttpClient, RateLimitedHttpClient } from '../base/http.js';
+import { createHttpClient, RateLimitedHttpClient, type HttpResponse } from '../base/http.js';
 import { discoverSalesforceSchema, getSalesforceDefaultObjects } from './schema.js';
+
+interface SalesforceQueryResponse {
+  totalSize: number;
+  done: boolean;
+  nextRecordsUrl?: string;
+  records: Array<{ Id: string; LastModifiedDate?: string; [key: string]: unknown }>;
+}
 
 // Salesforce OAuth URLs - production vs sandbox
 const SALESFORCE_PROD_AUTH_URL = 'https://login.salesforce.com/services/oauth2/authorize';
@@ -221,12 +228,7 @@ export class SalesforceConnector implements Connector {
     let queryUrl: string | null = `${baseUrl}/query?q=${encodeURIComponent(soql)}`;
 
     while (queryUrl) {
-      const response = await this.httpClient.request<{
-        totalSize: number;
-        done: boolean;
-        nextRecordsUrl?: string;
-        records: Array<{ Id: string; LastModifiedDate?: string; [key: string]: unknown }>;
-      }>({
+      const response: HttpResponse<SalesforceQueryResponse> = await this.httpClient.request<SalesforceQueryResponse>({
         method: 'GET',
         url: queryUrl.startsWith('http') ? queryUrl : `${credentials.instanceUrl}${queryUrl}`,
         headers: {
@@ -238,7 +240,7 @@ export class SalesforceConnector implements Connector {
         throw new Error(`Salesforce query failed: ${JSON.stringify(response.data)}`);
       }
 
-      const { records, done, nextRecordsUrl } = response.data;
+      const { records, done, nextRecordsUrl }: SalesforceQueryResponse = response.data;
 
       if (records.length === 0) {
         break;

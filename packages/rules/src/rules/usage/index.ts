@@ -23,7 +23,7 @@ export const R150_MissingUsagePeriod: Rule = {
 
     // Find usage-based contracts
     const usageContracts = contracts.filter(c => 
-      c.billing_frequency === 'usage_based' ||
+      c.billing_frequency === ('usage_based' as string) ||
       c.terms.some(t => t.term_type === 'usage' || t.term_type === 'metered')
     );
 

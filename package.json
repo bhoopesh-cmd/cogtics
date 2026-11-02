@@ -8,7 +8,7 @@
     "dev:api": "pnpm run --filter @cogtics/api dev",
     "dev:web": "pnpm run --filter @cogtics/web dev",
     "dev:worker": "pnpm run --filter @cogtics/worker dev",
-    "build": "pnpm run build:web && pnpm run build:api",
+    "build": "pnpm run build:web && pnpm run build:api && pnpm run build:worker",
     "build:web": "pnpm run --filter @cogtics/web build",
     "build:api": "pnpm run --filter @cogtics/api build",
     "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
@@ -28,7 +28,8 @@
     "validate:tenants": "tsx tools/validation/tenant-isolation-test.ts",
     "validate:resilience": "tsx tools/validation/resilience-test.ts",
     "validate:security": "tsx tools/validation/security-test.ts",
-    "validate:all": "pnpm validate && pnpm validate:detection && pnpm validate:tenants && pnpm validate:resilience && pnpm validate:security"
+    "validate:all": "pnpm validate && pnpm validate:detection && pnpm validate:tenants && pnpm validate:resilience && pnpm validate:security",
+    "build:worker": "pnpm run --filter @cogtics/worker build"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.1",

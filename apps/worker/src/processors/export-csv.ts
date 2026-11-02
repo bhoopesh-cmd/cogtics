@@ -225,7 +225,7 @@ async function generateIssuesCsv(
   logger: Logger
 ): Promise<{ content: string; rowCount: number }> {
   const columns = CSV_COLUMNS.issues_csv;
-  let content = toCsvRow(columns);
+  let content = toCsvRow(columns as unknown as unknown[]);
   let rowCount = 0;
   
   // Fetch issues in batches
@@ -283,7 +283,7 @@ async function generateRevRecCsv(
   logger: Logger
 ): Promise<{ content: string; rowCount: number }> {
   const columns = CSV_COLUMNS.revrec_csv;
-  let content = toCsvRow(columns);
+  let content = toCsvRow(columns as unknown as unknown[]);
   let rowCount = 0;
   
   const BATCH_SIZE = 10000;
@@ -347,7 +347,7 @@ async function generateContractsCsv(
   logger: Logger
 ): Promise<{ content: string; rowCount: number }> {
   const columns = CSV_COLUMNS.contracts_csv;
-  let content = toCsvRow(columns);
+  let content = toCsvRow(columns as unknown as unknown[]);
   let rowCount = 0;
   
   const BATCH_SIZE = 10000;

@@ -124,17 +124,17 @@ export async function processCsvParseJob(
           .values({
             id: `raw_${Date.now().toString(36)}${Math.random().toString(36).substring(2, 8)}`,
             tenant_id: tenantId,
-            connection_id: null,
+            connection_id: null as any,
             run_id: parseRunId,
             object_type: entityType,
-            source_system: 'manual_upload',
+            source_system: 'manual_upload' as any,
             batch_number: 1,
             record_count: 1,
             raw_data_json: result.data,
             cursor_value: null,
             is_final: true,
             created_at: new Date(),
-          })
+          } as any)
           .execute();
       } else {
         errorRows++;

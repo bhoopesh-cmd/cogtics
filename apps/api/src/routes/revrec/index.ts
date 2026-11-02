@@ -157,7 +157,7 @@ const revrecRoutes: FastifyPluginAsync = async (fastify) => {
       query = query.where('ro.contract_id', '=', contractId);
     }
     if (status) {
-      query = query.where('ro.status', '=', status);
+      query = query.where('ro.status', '=', status as any);
     }
 
     const obligations = await query
@@ -179,7 +179,7 @@ const revrecRoutes: FastifyPluginAsync = async (fastify) => {
       countQuery = countQuery.where('contract_id', '=', contractId);
     }
     if (status) {
-      countQuery = countQuery.where('status', '=', status);
+      countQuery = countQuery.where('status', '=', status as any);
     }
 
     const countResult = await countQuery.executeTakeFirst();
@@ -291,13 +291,13 @@ const revrecRoutes: FastifyPluginAsync = async (fastify) => {
       query = query.where('rs.obligation_id', '=', obligationId);
     }
     if (periodStart) {
-      query = query.where('rs.period_start', '>=', periodStart);
+      query = query.where('rs.period_start', '>=', periodStart as any);
     }
     if (periodEnd) {
-      query = query.where('rs.period_end', '<=', periodEnd);
+      query = query.where('rs.period_end', '<=', periodEnd as any);
     }
     if (status) {
-      query = query.where('rs.status', '=', status);
+      query = query.where('rs.status', '=', status as any);
     }
 
     const schedules = await query
@@ -356,7 +356,7 @@ const revrecRoutes: FastifyPluginAsync = async (fastify) => {
       query = query.where('rr.contract_id', '=', contractId);
     }
     if (status) {
-      query = query.where('rr.status', '=', status);
+      query = query.where('rr.status', '=', status as any);
     }
 
     const reconciliations = await query
@@ -378,7 +378,7 @@ const revrecRoutes: FastifyPluginAsync = async (fastify) => {
       countQuery = countQuery.where('contract_id', '=', contractId);
     }
     if (status) {
-      countQuery = countQuery.where('status', '=', status);
+      countQuery = countQuery.where('status', '=', status as any);
     }
 
     const countResult = await countQuery.executeTakeFirst();

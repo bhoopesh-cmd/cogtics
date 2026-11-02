@@ -168,7 +168,7 @@ export async function processEvidenceRegenerateJob(
         evidence_id: evidenceId,
         issue_id: issueId,
         calc_name: calc.name,
-        calc_type: calc.type,
+        calc_type: calc.type as any,
         formula: calc.formula,
         inputs_json: calc.inputs,
         outputs_json: calc.outputs,

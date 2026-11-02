@@ -74,7 +74,7 @@ export const jobRoutes: FastifyPluginAsync = async (fastify) => {
         .values({
           id: jobId,
           tenant_id: request.tenantId,
-          type: queueName,
+          type: queueName as any,
           status: 'pending',
           payload_json: payload,
           idempotency_key_id: idempotencyKeyId,

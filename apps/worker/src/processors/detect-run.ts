@@ -206,7 +206,7 @@ export async function processDetectRunJob(
 
         // Persist AI discoveries
         for (const discovery of aiDiscoveries) {
-          await db.insertInto('ai_discovered_issues').values({
+          await db.insertInto('ai_discovered_issues' as any).values({
             id: discovery.id,
             tenant_id: tenantId,
             snapshot_id: snapshotId,
@@ -249,9 +249,9 @@ export async function processDetectRunJob(
         run_id: runId,
         rule_id: issue.ruleId,
         rule_version: issue.ruleVersion,
-        issue_key: issueKey,
+        issue_key: issueKey ?? '',
         category: issue.category,
-        status: 'open',
+        status: 'open' as any,
         severity: issue.severity,
         confidence: issue.confidence,
         impact_amount: issue.impactAmount,
@@ -367,7 +367,11 @@ function buildDataQualityReport(
   // Calculate CRM data age (using contract updated_at)
   let latestContract = new Date(0);
   for (const c of data.contracts) {
-    const updatedAt = c.updated_at instanceof Date ? c.updated_at : new Date(c.updated_at);
+    const updatedAt = c.updated_at
+      ? c.updated_at instanceof Date
+        ? c.updated_at
+        : new Date(c.updated_at)
+      : new Date(0);
     if (updatedAt > latestContract) {
       latestContract = updatedAt;
     }

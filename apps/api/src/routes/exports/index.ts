@@ -19,10 +19,10 @@ const exportRoutes: FastifyPluginAsync = async (fastify) => {
   
   // Reuse queue instances if already created
   if (!exportCsvQueue) {
-    exportCsvQueue = new Queue('export.csv.generate', { connection: redis });
+    exportCsvQueue = new Queue('export.csv.generate', { connection: redis as any });
   }
   if (!exportPdfQueue) {
-    exportPdfQueue = new Queue('export.pdf.render', { connection: redis });
+    exportPdfQueue = new Queue('export.pdf.render', { connection: redis as any });
   }
 
   /**
@@ -106,7 +106,7 @@ const exportRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Enqueue job
     const queue = format === 'csv' ? exportCsvQueue : exportPdfQueue;
-    await queue.add(jobType, {
+    await queue!.add(jobType, {
       jobId,
       tenantId,
       payload: {
@@ -396,7 +396,7 @@ const exportRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Enqueue job
     const queue = format === 'csv' ? exportCsvQueue : exportPdfQueue;
-    await queue.add(jobType, {
+    await queue!.add(jobType, {
       jobId,
       tenantId,
       payload: {

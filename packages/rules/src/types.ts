@@ -20,16 +20,21 @@ export type { DetectionConfig, RuleTier };
 export type DataRequirement = 
   | 'contracts' 
   | 'invoices' 
+  | 'invoice_lines'
   | 'payments' 
   | 'usage_events' 
   | 'customers' 
   | 'products'
   | 'obligations'
   | 'schedules'
+  | 'contract_terms'
   | 'deferred_balances'
   | 'fx_rates'
   | 'prior_issues'
+  | 'prior_snapshot'
   | 'prior_snapshots';
+
+export type { Customer } from '@cogtics/db';
 import type {
   Contract,
   Invoice,
@@ -82,14 +87,17 @@ export interface Rule {
 // Rule Context
 // ============================================
 
-export interface ContractWithTerms extends Contract {
+export type ContractWithTerms = Contract & {
   terms: ContractTerm[];
   customer?: Customer;
-}
+  total_value?: number;
+  updated_at?: Date;
+};
 
 export interface InvoiceWithLines extends Invoice {
   lines: InvoiceLine[];
   customer?: Customer;
+  total_amount?: number;
 }
 
 export interface ScheduleWithObligation extends RevenueSchedule {
@@ -187,6 +195,8 @@ export interface RuleIssue {
   customerId?: string;
   /** Data quality flags affecting this issue */
   dataQualityFlags?: string[];
+  /** Rule that suppressed this issue, if any */
+  suppressedByRule?: string;
   /** Source evidence for this issue */
   sources?: IssueSourceRef[];
   /** Additional rule-specific metadata */

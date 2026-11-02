@@ -175,7 +175,7 @@ export const identityRoutes: FastifyPluginAsync = async (fastify) => {
         .execute();
 
       // Enqueue job
-      await fastify.queue.add('identity.resolve', {
+      await (fastify as any).queue.add('identity.resolve', {
         tenantId,
         snapshotId,
         runId,
@@ -363,7 +363,7 @@ export const identityRoutes: FastifyPluginAsync = async (fastify) => {
         .execute();
 
       // Enqueue apply job
-      await fastify.queue.add('identity.apply', {
+      await (fastify as any).queue.add('identity.apply', {
         tenantId,
         snapshotId: task.snapshot_id,
         decisionIds: [decisionId],

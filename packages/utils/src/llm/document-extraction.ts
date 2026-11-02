@@ -178,7 +178,7 @@ export async function extractStructuredFromImage(
       throw new Error(`OpenAI API error: ${error}`);
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
     const content = data.choices?.[0]?.message?.content;
     
     if (!content) {
@@ -265,7 +265,7 @@ export async function extractTextFromImage(
       throw new Error(`OpenAI API error: ${error}`);
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
     const extractedText = data.choices?.[0]?.message?.content || '';
 
     return {
@@ -337,7 +337,7 @@ export async function extractStructuredFromText(
       throw new Error(`OpenAI API error: ${error}`);
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
     const content = data.choices?.[0]?.message?.content;
     
     if (!content) {

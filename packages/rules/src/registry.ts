@@ -2,9 +2,9 @@
  * Rule Registry
  * Central registry for all detection rules with versioning
  */
-import SHA256 from 'crypto-js/sha256';
-import type { IssueCategory, RuleTier } from '@cogtics/schemas';
-import type { Rule, RuleRegistry, RuleRegistryEntry } from './types.js';
+import { createHash } from 'node:crypto';
+import type { RuleTier } from '@cogtics/schemas';
+import type { IssueCategory, Rule, RuleRegistry, RuleRegistryEntry } from './types.js';
 
 // ============================================
 // Rule Tier Order (execution sequence)
@@ -43,7 +43,7 @@ function generateRuleHash(rule: Rule): string {
     requiresData: rule.requiresData,
   });
   
-  return SHA256(hashInput).toString().substring(0, 16);
+  return createHash('sha256').update(hashInput).digest('hex').substring(0, 16);
 }
 
 // ============================================

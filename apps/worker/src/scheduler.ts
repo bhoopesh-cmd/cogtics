@@ -47,9 +47,9 @@ export class Scheduler {
     this.intervalMs = config.intervalMs ?? 60000; // 1 minute default
     
     // Initialize queues
-    this.exportCsvQueue = new Queue('export.csv.generate', { connection: this.redis });
-    this.exportPdfQueue = new Queue('export.pdf.render', { connection: this.redis });
-    this.digestQueue = new Queue('digest.send', { connection: this.redis });
+    this.exportCsvQueue = new Queue('export.csv.generate', { connection: this.redis as any });
+    this.exportPdfQueue = new Queue('export.pdf.render', { connection: this.redis as any });
+    this.digestQueue = new Queue('digest.send', { connection: this.redis as any });
   }
 
   /**
@@ -182,12 +182,12 @@ export class Scheduler {
       
       // Find review items stuck in 'in_review' for too long - reset to pending
       const stuckItems = await this.db
-        .selectFrom('review_queue')
+        .selectFrom('review_queue' as any)
         .select(['id', 'tenant_id'])
-        .where('status', '=', 'in_review')
+        .where('status', '=', 'in_review' as any)
         .where('created_at', '<', staleReviewThreshold)
         .limit(100)
-        .execute();
+        .execute() as Array<{ id: string; tenant_id: string }>;
       
       if (stuckItems.length > 0) {
         this.logger.info(
@@ -197,7 +197,7 @@ export class Scheduler {
         
         const stuckIds = stuckItems.map(i => i.id);
         await this.db
-          .updateTable('review_queue')
+          .updateTable('review_queue' as any)
           .set({
             status: 'pending',
             assigned_to: null,
@@ -210,14 +210,14 @@ export class Scheduler {
       
       // Find orphaned review items where the referenced term was deleted
       // This uses a LEFT JOIN to find items with no matching term
-      const orphanedByTerm = await this.db
+      const orphanedByTerm = await (this.db as any)
         .selectFrom('review_queue as rq')
         .leftJoin('contract_terms as ct', 'rq.term_id', 'ct.id')
         .select(['rq.id'])
         .where('rq.term_id', 'is not', null)
         .where('ct.id', 'is', null)
         .limit(100)
-        .execute();
+        .execute() as Array<{ id: string }>;
       
       if (orphanedByTerm.length > 0) {
         this.logger.info(
@@ -227,7 +227,7 @@ export class Scheduler {
         
         const orphanedIds = orphanedByTerm.map(i => i.id);
         await this.db
-          .deleteFrom('review_queue')
+          .deleteFrom('review_queue' as any)
           .where('id', 'in', orphanedIds)
           .execute();
         
@@ -235,14 +235,14 @@ export class Scheduler {
       }
       
       // Find orphaned conflicts where referenced bundle was deleted
-      const orphanedConflicts = await this.db
+      const orphanedConflicts = await (this.db as any)
         .selectFrom('term_conflicts as tc')
         .leftJoin('contract_bundles as cb', 'tc.bundle_id', 'cb.id')
         .select(['tc.id'])
         .where('tc.bundle_id', 'is not', null)
         .where('cb.id', 'is', null)
         .limit(100)
-        .execute();
+        .execute() as Array<{ id: string }>;
       
       if (orphanedConflicts.length > 0) {
         this.logger.info(
@@ -254,13 +254,13 @@ export class Scheduler {
         
         // First delete candidates
         await this.db
-          .deleteFrom('term_conflict_candidates')
-          .where('conflict_id', 'in', conflictIds)
+          .deleteFrom('term_conflict_candidates' as any)
+          .where('conflict_id' as any, 'in', conflictIds)
           .execute();
         
         // Then delete conflicts
         await this.db
-          .deleteFrom('term_conflicts')
+          .deleteFrom('term_conflicts' as any)
           .where('id', 'in', conflictIds)
           .execute();
         
@@ -522,7 +522,7 @@ export class Scheduler {
       .values({
         id: jobId,
         tenant_id,
-        type: 'digest',
+        type: 'digest' as any,
         status: 'pending',
         payload_json: {
           type: 'digest.send',

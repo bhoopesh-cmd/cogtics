@@ -54,10 +54,10 @@ const storagePlugin: FastifyPluginAsync = async (fastify) => {
     },
     // Tenant-prefixed methods - for when you want automatic prefixing
     getSignedUploadUrl: async (tenantId: string, key: string, options: { contentType: string; expiresIn: number }) => {
-      return client.getSignedUploadUrl(tenantId, key, options.contentType, options.expiresIn);
+      return client.getSignedUploadUrl(tenantId as any, key, options.contentType, options.expiresIn);
     },
     getSignedDownloadUrl: async (tenantId: string, key: string, expiresIn: number) => {
-      return client.getSignedDownloadUrl(tenantId, key, expiresIn);
+      return client.getSignedDownloadUrl(tenantId as any, key, expiresIn);
     },
     client,
   });

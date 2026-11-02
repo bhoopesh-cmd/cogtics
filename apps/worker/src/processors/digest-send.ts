@@ -228,7 +228,7 @@ async function aggregateDigestContent(
   let resolvedQuery = db
     .selectFrom('issue_status_history')
     .innerJoin('issues', 'issue_status_history.issue_id', 'issues.id')
-    .select(db.fn.countDistinct('issue_status_history.issue_id').as('count'))
+    .select((db.fn as any).countDistinct('issue_status_history.issue_id').as('count'))
     .where('issues.tenant_id', '=', tenantId)
     .where('issue_status_history.to_status', '=', 'resolved')
     .where('issue_status_history.created_at', '>=', periodStart)
@@ -239,7 +239,7 @@ async function aggregateDigestContent(
   }
   
   const resolvedResult = await resolvedQuery.executeTakeFirst();
-  const resolvedIssues = Number(resolvedResult?.count ?? 0);
+  const resolvedIssues = Number((resolvedResult as { count?: number } | undefined)?.count ?? 0);
   
   // Count total open issues
   let openQuery = db

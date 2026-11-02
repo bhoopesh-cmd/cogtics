@@ -401,7 +401,7 @@ export class ProductionLLMClient {
           throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
         }
 
-        const data: OpenAIResponse = await response.json();
+        const data: OpenAIResponse = (await response.json()) as OpenAIResponse;
         
         return {
           content: data.choices?.[0]?.message?.content || '',

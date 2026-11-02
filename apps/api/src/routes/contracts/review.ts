@@ -172,8 +172,8 @@ export const reviewRoutes: FastifyPluginAsync = async (fastify) => {
       if (item.document_id) {
         const document = await fastify.db
           .selectFrom('contract_documents')
-          .select(['id', 'file_name', 'document_type', 'status'])
-          .where('id', '=', item.document_id)
+          .select(['id', 'file_name', 'document_type', 'status'] as any)
+          .where('id', '=', item.document_id as any)
           .executeTakeFirst();
         relatedData.document = document;
       }
@@ -328,7 +328,7 @@ export const reviewRoutes: FastifyPluginAsync = async (fastify) => {
         .updateTable('review_queue')
         .set({
           status: 'escalated',
-          priority: fastify.db.raw('priority + 1'),
+          priority: (fastify.db as any).raw('priority + 1'),
         })
         .where('id', '=', id)
         .where('tenant_id', '=', tenantId)

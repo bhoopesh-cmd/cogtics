@@ -12,7 +12,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --rootDir ../..",
     "build": "tsc"
   },
   "dependencies": {
@@ -22,6 +22,7 @@
     "jsforce": "^1.11.1",
     "p-retry": "^6.2.0",
     "p-throttle": "^6.1.0",
+    "pino": "^8.17.2",
     "zod": "^3.22.4"
   },
   "devDependencies": {
@@ -29,4 +30,3 @@
     "typescript": "^5.3.2"
   }
 }
-

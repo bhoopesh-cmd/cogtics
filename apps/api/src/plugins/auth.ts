@@ -12,6 +12,7 @@ export interface AuthContext {
 declare module 'fastify' {
   interface FastifyRequest {
     auth: AuthContext | null;
+    userId: UserId;
   }
   interface FastifyInstance {
     jwt: {
@@ -34,6 +35,7 @@ const authPluginImpl: FastifyPluginAsync = async (fastify) => {
 
   // Decorate request with auth context
   fastify.decorateRequest('auth', null);
+  fastify.decorateRequest('userId', null as unknown as UserId);
 
   // JWT helpers (for dev/jwt modes)
   const jwtSecret = config.JWT_SECRET || 'dev-secret-change-in-production';

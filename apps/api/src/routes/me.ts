@@ -11,7 +11,7 @@ export const meRoutes: FastifyPluginAsync = async (fastify) => {
     const user = await fastify.db
       .selectFrom('users')
       .selectAll()
-      .where('id', '=', request.auth.userId)
+      .where('id', '=', request.userId)
       .executeTakeFirst();
 
     if (!user) {
@@ -22,7 +22,7 @@ export const meRoutes: FastifyPluginAsync = async (fastify) => {
     const tenant = await fastify.db
       .selectFrom('tenants')
       .selectAll()
-      .where('id', '=', request.auth.tenantId)
+      .where('id', '=', request.tenantId)
       .executeTakeFirst();
 
     if (!tenant) {

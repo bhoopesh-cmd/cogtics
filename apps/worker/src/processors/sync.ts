@@ -41,7 +41,7 @@ export async function processSyncJob(
   }
 
   // Legacy Phase 0 stub for non-connector syncs
-  const legacyPayload = payload as LegacySyncPayload;
+  const legacyPayload = payload as unknown as LegacySyncPayload;
   logger.info({ source: legacyPayload.source, fullSync: legacyPayload.fullSync }, 'Processing legacy sync job');
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -298,15 +298,12 @@ async function processBatch(
   const s3Key = `raw/${tenantId}/${connectionId}/${objectType}/${runId}/${batchId}.jsonl`;
 
   // Upload to S3
-  await ctx.storage.put(s3Key, buffer, {
-    contentType: 'application/x-ndjson',
-    metadata: {
-      tenantId,
-      connectionId,
-      runId,
-      objectType,
-      recordCount: String(records.length),
-    },
+  await (ctx.storage as any).uploadStream(s3Key, buffer, 'application/x-ndjson', {
+    tenantId,
+    connectionId,
+    runId,
+    objectType,
+    recordCount: String(records.length),
   });
 
   // Find min/max updated_at

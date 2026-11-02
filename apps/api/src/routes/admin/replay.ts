@@ -55,7 +55,7 @@ export const replayRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: 'Snapshot not found' });
     }
 
-    if (!force && snapshot.status === 'processing') {
+    if (!force && snapshot.status === ('processing' as any)) {
       return reply.status(409).send({ error: 'Snapshot is currently processing' });
     }
 
@@ -83,10 +83,10 @@ export const replayRoutes: FastifyPluginAsync = async (fastify) => {
       .values({
         id: jobId,
         tenant_id: tenantId,
-        type: 'ingest.full',
+        type: 'ingest.full' as any,
         status: 'pending',
         payload_json: {
-          type: 'ingest.full',
+          type: 'ingest.full' as any,
           snapshotId: id,
           replay: true,
           replayId,
@@ -159,10 +159,10 @@ export const replayRoutes: FastifyPluginAsync = async (fastify) => {
       .values({
         id: jobId,
         tenant_id: tenantId,
-        type: 'detect.replay',
+        type: 'detect.replay' as any,
         status: 'pending',
         payload_json: {
-          type: 'detect.replay',
+          type: 'detect.replay' as any,
           snapshotId: detectionRun.snapshot_id,
           originalRunId: runId,
           replayId,
@@ -235,10 +235,10 @@ export const replayRoutes: FastifyPluginAsync = async (fastify) => {
       .values({
         id: jobId,
         tenant_id: tenantId,
-        type: 'evidence.generate',
+        type: 'evidence.generate' as any,
         status: 'pending',
         payload_json: {
-          type: 'evidence.generate',
+          type: 'evidence.generate' as any,
           snapshotId,
           regenerateAll: true,
           replayId,

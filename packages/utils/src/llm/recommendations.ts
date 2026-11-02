@@ -172,13 +172,13 @@ export class RecommendationLLM extends ProductionLLMClient {
     for (const cluster of significantClusters.slice(0, mergedConfig.maxRecommendations)) {
       const contract = context.contracts.find(c => c.id === cluster.commonContractId);
       const customer = contract?.customer || 
-        context.customers.find(c => c.id === cluster.commonCustomerId);
+        context.customers.find(c => c.id === (cluster as { commonCustomerId?: string }).commonCustomerId);
 
       const clusterRecs = await this.generateClusterRecommendations(
         cluster,
         {
-          contractName: contract?.name,
-          customerName: customer?.name,
+          contractName: contract?.name ?? undefined,
+          customerName: customer?.name ?? undefined,
           totalImpact: cluster.totalImpact,
           currency: cluster.currency,
         }
@@ -388,10 +388,9 @@ export class RecommendationLLM extends ProductionLLMClient {
         estimatedImpact: {
           revenueChange: context.totalImpact,
           currency: context.currency,
-          affectedContracts: 1,
           confidence: 0.5,
         },
-        suggestedSimulation: { overrides: [] },
+        suggestedSimulation: { description: 'Automated recommendation', overrides: [] },
         effort: 'medium' as const,
         reasoning: 'Automated recommendation based on detected issues',
         status: 'pending' as const,
@@ -422,13 +421,13 @@ export class RecommendationLLM extends ProductionLLMClient {
       description: response.description,
       estimatedImpact: response.estimatedImpact,
       suggestedSimulation: {
+        description: response.suggestedSimulation?.description ?? '',
         overrides,
       },
       effort: response.effort,
       reasoning: response.reasoning,
       status: 'pending' as const,
       createdAt: new Date(),
-      needsReview: computeNeedsReview(confidence),
     };
   }
 

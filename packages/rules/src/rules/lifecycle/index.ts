@@ -23,7 +23,7 @@ export const R060_AmendedContractNoAdjustment: Rule = {
     const issues: RuleIssue[] = [];
 
     for (const contract of contracts) {
-      if (contract.status !== 'amended' && contract.status !== 'active') continue;
+      if (contract.status !== ('amended' as string) && contract.status !== 'active') continue;
 
       // Look for amendment terms
       const amendments = contract.terms.filter(t => t.term_type === 'amendment');

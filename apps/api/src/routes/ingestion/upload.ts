@@ -21,7 +21,7 @@ export const uploadRoutes: FastifyPluginAsync = async (app) => {
 
         // Construct storage key: uploads/{tenantId}/{year}/{month}/{uploadId}.csv
         // For now mocking tenantId since auth might store it differently per user
-        const tenantId = (req.user as any)?.tenantId || 'default-tenant';
+        const tenantId = (req as any).user?.tenantId || 'default-tenant';
         const date = new Date();
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');

@@ -20,7 +20,7 @@ let pdfParse: undefined | ((data: Buffer) => Promise<any>);
 const getPdfParse = async () => {
   if (!pdfParse) {
     const mod = await import('pdf-parse');
-    pdfParse = ((mod as { default?: typeof pdfParse }).default ?? mod) as typeof pdfParse;
+    pdfParse = ((mod as any).default ?? mod) as any;
   }
   return pdfParse!;
 };

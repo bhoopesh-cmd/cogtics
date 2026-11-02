@@ -42,7 +42,7 @@ export async function getQueueDepth(
   const result = await fastify.db
     .selectFrom('jobs')
     .select((eb) => eb.fn.count<number>('id').as('count'))
-    .where('type', '=', queueType)
+    .where('type', '=', queueType as any)
     .where('status', 'in', ['pending', 'processing'])
     .executeTakeFirst();
 
