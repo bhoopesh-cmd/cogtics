@@ -1,3 +1,5 @@
+-- migrate:up
+
 -- Migration 016: AI Detection Engine
 -- Adds support for AI-powered issue enrichment, anomaly detection, and recommendations
 
@@ -205,3 +207,15 @@ CREATE TRIGGER ai_recommendations_updated_at
   BEFORE UPDATE ON ai_recommendations
   FOR EACH ROW
   EXECUTE FUNCTION update_ai_updated_at();
+
+-- migrate:down
+
+DROP TRIGGER IF EXISTS ai_discovered_issues_updated_at ON ai_discovered_issues;
+DROP TRIGGER IF EXISTS ai_recommendations_updated_at ON ai_recommendations;
+DROP TABLE IF EXISTS llm_usage_logs;
+DROP TABLE IF EXISTS ai_recommendations;
+DROP TABLE IF EXISTS ai_discovered_issues;
+ALTER TABLE detection_runs DROP COLUMN IF EXISTS ai_enrichment_stats;
+ALTER TABLE issues DROP COLUMN IF EXISTS ai_enriched_at;
+ALTER TABLE issues DROP COLUMN IF EXISTS ai_analysis_json;
+DROP FUNCTION IF EXISTS update_ai_updated_at();

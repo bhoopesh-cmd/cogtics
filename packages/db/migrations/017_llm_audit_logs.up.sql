@@ -1,3 +1,5 @@
+-- migrate:up
+
 -- ============================================
 -- LLM Audit Logs for Request/Response Persistence
 -- ============================================
@@ -108,3 +110,7 @@ COMMENT ON COLUMN llm_request_logs.prompt_version IS 'Version of the prompt temp
 COMMENT ON COLUMN llm_request_logs.needs_review IS 'Flag for low-confidence outputs requiring human review';
 COMMENT ON COLUMN llm_request_logs.validation_passed IS 'Whether Zod schema validation passed';
 COMMENT ON COLUMN llm_request_logs.response_parsed IS 'Parsed and validated JSON response';
+
+-- migrate:down
+
+DROP TABLE IF EXISTS llm_request_logs;
