@@ -16,7 +16,7 @@ describe('AnomalyDetectionLLM', () => {
 
   beforeEach(() => {
     vi.stubEnv('OPENAI_API_KEY', 'test-api-key');
-    llm = new AnomalyDetectionLLM({ apiKey: 'test-api-key' });
+    llm = new AnomalyDetectionLLM({ apiKey: 'test-api-key', maxRetries: 1 });
     mockFetch.mockReset();
   });
 

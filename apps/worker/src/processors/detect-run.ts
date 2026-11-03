@@ -364,14 +364,16 @@ function buildDataQualityReport(
     ? (Date.now() - latestUsage.getTime()) / (1000 * 60 * 60)
     : 0;
 
-  // Calculate CRM data age (using contract updated_at)
+  // Calculate CRM data age (using contract created_at/updated_at)
   let latestContract = new Date(0);
   for (const c of data.contracts) {
     const updatedAt = c.updated_at
       ? c.updated_at instanceof Date
         ? c.updated_at
         : new Date(c.updated_at)
-      : new Date(0);
+      : c.created_at instanceof Date
+        ? c.created_at
+        : new Date(c.created_at);
     if (updatedAt > latestContract) {
       latestContract = updatedAt;
     }

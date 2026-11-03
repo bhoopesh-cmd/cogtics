@@ -35,10 +35,17 @@ export * from './cost-tracker.js';
 export * from './cache.js';
 
 // Zod schemas for LLM response validation
-export {
+export type {
   AIDiscoveredIssue,
-  AIDiscoveredIssueSchema,
   AIRecommendation,
+  CSVAnalysisResponse,
+  IssueEnrichment,
+  RawTerm,
+  SimulationOverride,
+} from './schemas.js';
+
+export {
+  AIDiscoveredIssueSchema,
   AIRecommendationSchema,
   AnomalyCategorySchema,
   AnomalyDetectionResponseSchema,
@@ -48,7 +55,6 @@ export {
   computeNeedsReview,
   ConfidenceSchema,
   ConflictResolutionSchema,
-  CSVAnalysisResponse,
   CSVAnalysisResponseSchema,
   CSVAnalysisResultSchema,
   CSVEntityTypeSchema,
@@ -62,7 +68,6 @@ export {
   FieldCategorySchema,
   FixSuggestionResponseSchema,
   ImpactEstimationResponseSchema,
-  IssueEnrichment,
   IssueEnrichmentResponseSchema,
   IssueEnrichmentSchema,
   LLMExtractionSchema,
@@ -73,12 +78,10 @@ export {
   PartyInfoSchema,
   PrioritySchema,
   ProductInfoSchema,
-  RawTerm,
   RawTermSchema,
   RecommendationResponseSchema,
   safeParseLLMResponse,
   SeveritySchema,
-  SimulationOverride,
   SimulationOverrideSchema,
   StructuredContractDataSchema,
   SuggestedSimulationSchema,

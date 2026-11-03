@@ -356,9 +356,10 @@ export class ProductionLLMClient {
     let delay = this.limits.rateLimitInitialDelayMs;
 
     while (attempt < this.limits.rateLimitRetries + this.maxRetries) {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+        timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
         const response = await fetch(`${this.baseUrl}/chat/completions`, {
           method: 'POST',
@@ -409,6 +410,7 @@ export class ProductionLLMClient {
           outputTokens: data.usage?.completion_tokens || this.estimateTokens(data.choices?.[0]?.message?.content || ''),
         };
       } catch (error) {
+        if (timeoutId) clearTimeout(timeoutId);
         lastError = error as Error;
         
         // Abort errors shouldn't be retried
