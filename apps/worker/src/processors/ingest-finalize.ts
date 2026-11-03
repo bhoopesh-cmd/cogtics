@@ -78,7 +78,7 @@ export async function processIngestFinalizeJob(
         status: finalStatus,
         completed_at: new Date(),
         record_counts: recordCounts,
-        quality_results: qualityResults,
+        quality_results: JSON.stringify(qualityResults),
         metadata_json: {
           dataFreshness,
           totalRecords: Object.values(recordCounts).reduce((a, b) => a + (b as number), 0),

@@ -22,7 +22,8 @@ interface IngestLoadContext {
 export async function processIngestLoadJob(
   payload: IngestLoadJobPayload,
   logger: Logger,
-  db: Kysely<Database>
+  db: Kysely<Database>,
+  providedStorage?: StorageClient
 ): Promise<JobResult> {
   const { tenantId, snapshotId, batchIds, connectionId } = payload;
   const startTime = Date.now();
@@ -30,7 +31,7 @@ export async function processIngestLoadJob(
   logger.info({ snapshotId, batchIds: batchIds.length, connectionId }, 'Starting ingest load');
 
   // Initialize storage client
-  const storage = createStorageClient({
+  const storage = providedStorage ?? createStorageClient({
     endpoint: process.env.S3_ENDPOINT!,
     accessKey: process.env.S3_ACCESS_KEY!,
     secretKey: process.env.S3_SECRET_KEY!,
