@@ -91,8 +91,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://cogtics:cogtics@localhost:5432/cogtics
+      DATABASE_URL: postgresql://cogtics:cogtics@localhost:5432/cogtics?sslmode=disable
       REDIS_URL: redis://localhost:6379
+      PGSSLMODE: disable
       NODE_ENV: test
     steps:
       - name: Checkout
