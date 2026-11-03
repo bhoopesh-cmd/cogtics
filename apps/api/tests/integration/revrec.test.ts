@@ -70,6 +70,12 @@ describe('Revenue Recognition Integration Tests', () => {
   beforeEach(async () => {
     if (!db) return;
 
+    await db
+      .insertInto('tenants')
+      .values({ id: TENANT_ID, name: 'RevRec Test Tenant', status: 'active' })
+      .onConflict((oc) => oc.column('id').doNothing())
+      .execute();
+
     // Setup test snapshot
     await db
       .insertInto('snapshots')
@@ -79,7 +85,7 @@ describe('Revenue Recognition Integration Tests', () => {
         status: 'complete',
         metadata_json: {},
         record_counts: {},
-        quality_results: [],
+        quality_results: JSON.stringify([]),
       })
       .onConflict((oc) => oc.column('id').doNothing())
       .execute();
@@ -135,7 +141,7 @@ describe('Revenue Recognition Integration Tests', () => {
           tenant_id: TENANT_ID,
           snapshot_id: SNAPSHOT_ID,
           contract_id: CONTRACT_ID,
-          version_number: 1,
+          version: 1,
           effective_date: '2024-01-01',
           changes_json: {},
         })
@@ -433,7 +439,7 @@ describe('Revenue Recognition Integration Tests', () => {
         tenant_id: TENANT_ID,
         snapshot_id: SNAPSHOT_ID,
         contract_id: newContractId,
-        version_number: 1,
+        version: 1,
         effective_date: '2024-01-01',
         changes_json: {},
       }).execute();
@@ -490,7 +496,7 @@ describe('Revenue Recognition Integration Tests', () => {
         tenant_id: TENANT_ID,
         snapshot_id: SNAPSHOT_ID,
         contract_id: newContractId,
-        version_number: 1,
+        version: 1,
         effective_date: '2024-01-01',
         changes_json: {},
       }).execute();

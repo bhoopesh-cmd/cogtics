@@ -44,7 +44,7 @@ describe('Upload Integration Tests', () => {
       .values({
         id: TEST_TENANT_ID,
         name: 'Test Tenant Uploads',
-        slug: 'test-uploads',
+        status: 'active',
       })
       .onConflict((oc) => oc.column('id').doNothing())
       .execute();

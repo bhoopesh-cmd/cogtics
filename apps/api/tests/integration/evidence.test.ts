@@ -322,7 +322,7 @@ async function setupTestData(db: Kysely<Database>) {
     status: 'complete',
     metadata_json: {},
     record_counts: {},
-    quality_results: [],
+    quality_results: JSON.stringify([]),
   }).onConflict(c => c.column('id').doNothing()).execute();
 
   // Create test detection run

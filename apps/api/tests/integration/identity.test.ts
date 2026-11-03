@@ -2,6 +2,7 @@
  * Identity Resolution Integration Tests
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
 import type { Database } from '@cogtics/db';
@@ -40,9 +41,7 @@ describe('Identity Resolution Integration Tests', () => {
     await db.insertInto('tenants').values({
       id: tenantId,
       name: 'Test Tenant',
-      slug: `test-${Date.now()}`,
       status: 'active',
-      settings_json: {},
     }).execute();
 
     // Set RLS context
@@ -72,13 +71,13 @@ describe('Identity Resolution Integration Tests', () => {
   beforeEach(async () => {
     if (SKIP_DB_TESTS) return;
     // Create test snapshot
-    snapshotId = `snap_${Date.now()}`;
+    snapshotId = `snap_${randomUUID().replace(/-/g, '').slice(0, 20)}`;
     await db.insertInto('snapshots').values({
       id: snapshotId,
       tenant_id: tenantId,
       status: 'complete',
-      record_counts_json: {},
-      quality_json: {},
+      record_counts: {},
+      quality_results: JSON.stringify([]),
     }).execute();
   });
 
@@ -309,7 +308,7 @@ describe('Identity Resolution Integration Tests', () => {
         .executeTakeFirst();
 
       expect(candidate).toBeDefined();
-      expect(candidate?.score).toBe(85);
+      expect(Number(candidate?.score)).toBe(85);
     });
 
     it('should create identity and add members', async () => {

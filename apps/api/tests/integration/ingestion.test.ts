@@ -77,7 +77,10 @@ describe('Ingestion Pipeline Integration Tests', () => {
       await db.deleteFrom('invoices').where('tenant_id', '=', TENANT_ID).execute().catch(() => {});
       await db.deleteFrom('products').where('tenant_id', '=', TENANT_ID).execute().catch(() => {});
       await db.deleteFrom('raw_batches').where('tenant_id', '=', TENANT_ID).execute().catch(() => {});
+      await db.deleteFrom('connector_runs').where('tenant_id', '=', TENANT_ID).execute().catch(() => {});
+      await db.deleteFrom('connections').where('tenant_id', '=', TENANT_ID).execute().catch(() => {});
       await db.deleteFrom('snapshots').where('tenant_id', '=', TENANT_ID).execute().catch(() => {});
+      await db.deleteFrom('tenants').where('id', '=', TENANT_ID).execute().catch(() => {});
       
       await db.destroy();
     }
@@ -85,6 +88,37 @@ describe('Ingestion Pipeline Integration Tests', () => {
 
   beforeEach(async () => {
     if (!db) return;
+
+    await db
+      .insertInto('tenants')
+      .values({ id: TENANT_ID, name: 'Ingestion Test Tenant', status: 'active' })
+      .onConflict((oc) => oc.column('id').doNothing())
+      .execute();
+
+    await db
+      .insertInto('connections')
+      .values({
+        id: CONNECTION_ID,
+        tenant_id: TENANT_ID,
+        provider: 'stripe',
+        status: 'connected',
+        display_name: 'Ingestion Test Connection',
+        config_json: {},
+      })
+      .onConflict((oc) => oc.column('id').doNothing())
+      .execute();
+
+    await db
+      .insertInto('connector_runs')
+      .values({
+        id: 'run_test',
+        connection_id: CONNECTION_ID,
+        tenant_id: TENANT_ID,
+        run_type: 'full',
+        status: 'completed',
+      })
+      .onConflict((oc) => oc.column('id').doNothing())
+      .execute();
 
     // Setup test snapshot
     await db
@@ -95,7 +129,7 @@ describe('Ingestion Pipeline Integration Tests', () => {
         status: 'pending',
         metadata_json: {},
         record_counts: {},
-        quality_results: [],
+        quality_results: JSON.stringify([]),
       })
       .onConflict((oc) => oc.column('id').doNothing())
       .execute();
@@ -113,7 +147,7 @@ describe('Ingestion Pipeline Integration Tests', () => {
           tenant_id: TENANT_ID,
           connection_id: CONNECTION_ID,
           run_id: 'run_test',
-          object_type: 'stripe-customers',
+          object_type: 'customers',
           s3_key: 'tenants/test/stripe-customers.jsonl',
           record_count: 1,
         })
@@ -322,15 +356,15 @@ describe('Ingestion Pipeline Integration Tests', () => {
         status: 'pending',
         metadata_json: {},
         record_counts: {},
-        quality_results: [],
+        quality_results: JSON.stringify([]),
       }).execute();
 
       await db.insertInto('raw_batches').values({
         id: newBatchId,
         tenant_id: TENANT_ID,
         connection_id: CONNECTION_ID,
-        run_id: 'run_e2e',
-        object_type: 'stripe-customers',
+        run_id: 'run_test',
+        object_type: 'customers',
         s3_key: 'tenants/test/stripe-customers.jsonl',
         record_count: 1,
       }).execute();

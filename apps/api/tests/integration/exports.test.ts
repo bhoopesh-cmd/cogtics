@@ -145,7 +145,7 @@ describe.skipIf(shouldSkip)('Phase 10: Exports API Integration Tests', () => {
 
       expect(file).toBeDefined();
       expect(file?.file_name).toBe('issues.csv');
-      expect(file?.size_bytes).toBe(1024);
+      expect(Number(file?.size_bytes)).toBe(1024);
     });
 
     it('should create export audit record', async () => {
@@ -208,8 +208,8 @@ describe.skipIf(shouldSkip)('Phase 10: Exports API Integration Tests', () => {
           tenant_id: TEST_TENANT_ID,
           name: 'Weekly Issues Digest',
           cadence: 'weekly',
-          scope_json: { issuesSeverity: ['high', 'critical'] },
-          recipients_json: ['test@example.com'],
+          scope_json: JSON.stringify({ issuesSeverity: ['high', 'critical'] }),
+          recipients_json: JSON.stringify(['test@example.com']),
           is_active: true,
           created_by: TEST_USER_ID,
         })
