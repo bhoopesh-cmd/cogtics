@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit --rootDir ../.."
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.470.0",
+    "@aws-sdk/s3-request-presigner": "^3.470.0",
     "@cogtics/connectors": "workspace:*",
     "@cogtics/db": "workspace:*",
     "@cogtics/revrec": "workspace:*",
@@ -17,15 +19,19 @@
     "@cogtics/schemas": "workspace:*",
     "@cogtics/utils": "workspace:*",
     "bullmq": "^5.1.0",
+    "date-fns": "^3.6.0",
     "dotenv": "^17.2.3",
     "ioredis": "^5.3.2",
     "kysely": "^0.27.6",
+    "nanoid": "^5.0.0",
     "papaparse": "^5.5.3",
     "pdf-parse": "1.1.1",
+    "pg": "^8.11.3",
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.0",
     "handlebars": "^4.7.8",
-    "nodemailer": "^6.9.8"
+    "nodemailer": "^6.9.8",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

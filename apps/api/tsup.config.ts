@@ -8,5 +8,6 @@ export default defineConfig({
   outDir: 'dist',
   sourcemap: true,
   clean: true,
+  skipNodeModulesBundle: true,
   noExternal: [/^@cogtics\//],
 });
