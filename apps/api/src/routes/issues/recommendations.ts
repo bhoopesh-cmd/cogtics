@@ -296,7 +296,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
       name: body.name || `AI: ${recommendation.title}`,
       description: suggestedSim.description || recommendation.description,
       status: 'draft',
-      overrides_json: suggestedSim.overrides as any,
+      overrides_json: JSON.stringify(suggestedSim.overrides),
       metadata_json: {
         recommendationId: id,
         createdBy: userId,

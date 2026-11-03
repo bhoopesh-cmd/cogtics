@@ -35,8 +35,8 @@ const digestRoutes: FastifyPluginAsync = async (fastify) => {
         tenant_id: tenantId,
         name: body.name,
         cadence: body.cadence,
-        scope_json: body.scope ?? {},
-        recipients_json: body.recipients,
+        scope_json: JSON.stringify(body.scope ?? {}),
+        recipients_json: JSON.stringify(body.recipients),
         is_active: true,
         created_by: userId ?? null,
         created_at: new Date(),
@@ -169,8 +169,8 @@ const digestRoutes: FastifyPluginAsync = async (fastify) => {
     const updates: Record<string, unknown> = { updated_at: new Date() };
     if (body.name !== undefined) updates.name = body.name;
     if (body.cadence !== undefined) updates.cadence = body.cadence;
-    if (body.scope !== undefined) updates.scope_json = body.scope;
-    if (body.recipients !== undefined) updates.recipients_json = body.recipients;
+    if (body.scope !== undefined) updates.scope_json = JSON.stringify(body.scope);
+    if (body.recipients !== undefined) updates.recipients_json = JSON.stringify(body.recipients);
     if (body.isActive !== undefined) updates.is_active = body.isActive;
 
     await fastify.db

@@ -14,7 +14,6 @@ declare module 'fastify' {
 const tenantPluginImpl: FastifyPluginAsync = async (fastify) => {
   // Decorate request with tenant context
   fastify.decorateRequest('tenantId', null as unknown as TenantId);
-  fastify.decorateRequest('userId', null as unknown as UserId);
   fastify.decorateRequest('setTenantContext', null);
 
   fastify.addHook('preHandler', async (request) => {

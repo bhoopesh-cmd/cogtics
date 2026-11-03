@@ -574,7 +574,7 @@ export const simulationRoutes: FastifyPluginAsync = async (fastify) => {
       .execute();
 
     // Queue the simulation job
-    const simulationQueue = (queues as any)?.get?.('simulation.run');
+    const simulationQueue = (queues as any)?.['simulation.run'];
     if (simulationQueue) {
       await simulationQueue.add('simulation.run', {
         tenantId,
