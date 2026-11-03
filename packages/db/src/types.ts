@@ -130,7 +130,7 @@ export type IdempotencyKeyUpdate = Updateable<IdempotencyKeysTable>;
 export interface JobsTable {
   id: string;
   tenant_id: string;
-  type: 'sync' | 'detect' | 'simulate' | 'export';
+  type: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   payload_json: unknown;
   result_json: unknown | null;
