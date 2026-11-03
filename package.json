@@ -18,7 +18,7 @@
     "db:seed": "pnpm run --filter @cogtics/db seed",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
-    "typecheck": "pnpm run -r typecheck",
+    "typecheck": "pnpm run -r --workspace-concurrency=1 typecheck",
     "test": "vitest run",
     "test:unit": "vitest run --exclude \"apps/api/tests/**\"",
     "test:watch": "vitest",
